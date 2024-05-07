@@ -47,3 +47,5 @@ DataRaw.nosync/*
 DataProcessed.nosync/*
 .ProjData/*
 *.DS_Store
+Background/nabat-code-tutorial.nosync/*
+Background/vignette-bayesian-site-occupancy-model-bat-acoustic-data.nosync/*
