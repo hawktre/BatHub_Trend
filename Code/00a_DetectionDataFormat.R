@@ -34,7 +34,7 @@ tblSite <- read_csv("DataRaw.nosync/database/tblSite.csv")
 tluClutter <- read_csv("DataRaw.nosync/database/tluClutter.csv")
 tluWaterBodyType <- read_csv("DataRaw.nosync/database/tluWaterBodyType.csv")
 
-acoustics_example <- read_csv("Code/vignette-bayesian-site-occupancy-model-bat-acoustic-data.nosync/data/survey_data.csv")
+acoustics_example <- read_csv("Background/vignette-bayesian-site-occupancy-model-bat-acoustic-data.nosync/data/survey_data.csv")
 
 # Join all tables together ------------------------------------------------
 
@@ -138,20 +138,8 @@ acoustics_wide <- acoustics_wide %>%
 
 
 
-# Get Daymet min temp -----------------------------------------------------
-## Read in study extent
-conus10k <- read_sf(here("DataRaw.nosync/conus_10km_full/complete_conus_mastersample_10km_attributed.shp"))
-
-## Crop to contain only PNW
-pnw <- c("Oregon", "Washington", "Idaho")
-
-conus10k_pnw <- conus10k %>% 
-  filter(state_n_1 %in% pnw | state_n_2 %in% pnw)
-
-## Check our study area
-plot(conus10k_pnw["state_n_1"])
-
-#create a function to get daymet data for every pointi
+# Get Daymet min temp (using daymetr)-----------------------------------------------------
+## create a function to get daymet data for every point
 get_daymet <- function(i, dat){
   tmp <- download_daymet(site = dat$LocationName[i],
                          lat = dat$Latitude[i],
@@ -175,9 +163,13 @@ daymet_get <- acoustics_wide %>%
   distinct() %>% 
   arrange(LocationName)
 
-#download data for all sites 
-daymet_all <- lapply(1:nrow(daymet_get), function(x){get_daymet(i = x, dat = daymet_get)}) 
-write_rds(daymet_all, here("DataRaw.nosync/daymet/daymet_full.rds"))
+#download data for all sites (commented out because it takes a long time. ONLY RUN THE FIRST TIME)
+# daymet_all <- lapply(1:nrow(daymet_get), function(x){get_daymet(i = x, dat = daymet_get)}) 
+# write_rds(daymet_all, here("DataRaw.nosync/daymet/daymet_full.rds"))
+
+
+#Read in the daymet data (completed above) ------------------------------
+daymet_all <- readRDS(here("DataRaw.nosync/daymet/daymet_full.rds"))
 
 #Clean up
 daymet_all <- daymet_all %>%
@@ -187,14 +179,9 @@ daymet_all <- daymet_all %>%
 #Join with detection data
 acoustics_wide <- acoustics_wide %>% 
   mutate(location_date = paste0(LocationName, "_", Night)) %>% 
-  left_join(.,daymet_all, by = "location_date")
+  left_join(.,daymet_all, by = "location_date") %>% 
+  select(-c(site,date,location_date)) #drop joined fields we don't need. 
   
-acoustics_wide <- acoustics_wide %>% 
-  select(-c(site, date, location_date))
 
 #Write out
 write_csv(acoustics_wide, here("DataProcessed.nosync/detections_formatted_2016-2022.csv"))
-
-detections <- st_as_sf(acoustics_wide, coords = c("Longitude", "Latitude"))
-
-plot(detections)
