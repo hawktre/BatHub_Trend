@@ -41,7 +41,10 @@ pnw <- c("Oregon", "Washington", "Idaho")
 
 ## subset and plot
 nabat_pnw <- nabat_covars %>% 
-  filter(admin1 %in% pnw) 
+  filter(admin1 %in% pnw | admin2 %in% pnw) %>% 
+  mutate(admin1 = case_when(!(admin1 %in% pnw) ~ admin2,
+                               TRUE ~ admin1))
+
 
 plot(nabat_pnw['admin1'])
 
@@ -62,6 +65,7 @@ conus_pnw_covars <- nabat_pnw %>%
 ## rename to make it easier to call
 covars <- conus_pnw_covars
 
+plot(covars["state"])
 # Get Cliff_Canyon ---------------------------------------------------------------
 ## Create a single layer
 landfire <- terra::merge(landfire_or, landfire_wa, landfire_id, first = T)

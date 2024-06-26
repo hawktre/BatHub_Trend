@@ -59,13 +59,3 @@ nw_grid_shp <- nw_grid_shp %>%
   arrange(desc(samp_all), cell)
   
 saveRDS(nw_grid_shp, here("DataProcessed.nosync/occurrence/nw_grid_shp.rds"))
-
-
-# scale covariates for model --------------------------------------------------------
-
-xmat <- nw_grid_shp %>% 
-  st_drop_geometry() %>% 
-  arrange(desc(samp_all), cell) %>% 
-  mutate(log_fc = log(p_forest + 1)) %>%  #log forest not to get 0
-  select(log_fc, precip, cliff_cover) %>% 
-  scale()

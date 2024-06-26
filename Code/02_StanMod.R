@@ -56,11 +56,24 @@ possible_bats <- c("laci",
                    "mylu",
                    "coto")
 # Detections and Nightly Covariates ---------------------------------------
-
 ## Nightly Covariates ##
+#Join nw_nights to find state
+state_key <- nw_grid_shp %>% 
+  select(cell, state)
+
+nw_nights <- left_join(nw_nights, state_key, by = "cell")
+
 #Arrange nights by conus_id, then year
 nw_nights_all <- nw_nights %>%
-  arrange(cell, year)
+  arrange(cell, year) %>% 
+  filter(!is.na(state)) # filter out california data
+
+nw_nights_spat <- nw_nights_all %>% 
+  st_as_sf(coords = c('lon','lat'), crs = st_crs(nw_grid_shp))
+
+ggplot()+
+  geom_sf(data = nw_grid_shp, aes(fill = factor(samp_2018)))+
+  geom_sf(data = nw_nights_spat, aes(color = state))
 
 #calculated scaled versions of the nightly continuous covariates
 vmat_temp_a <- nw_nights_all %>%
@@ -184,17 +197,16 @@ for (i in 1:length(occ_data)) {
   print(names(occ_data)[i])
   
   # Fit occupancy model in Stan
-  occ_stan <- sampling(object = docc_model1,
+  occ_stan <- rstan::sampling(object = docc_model1,
                        data = occ_data[[i]])
-  path_name <- paste0("DataProcessed.nosync/results/",names(occ_data)[i], "_stan.rds")
+  path_name <- paste0("DataProcessed.nosync/results/stan/full/fits/",names(occ_data)[i], "_stan.rds")
   
-  saveRDS(occ_stan, here("DataProcessed.nosync/results/stan_res.rds"))
+  saveRDS(occ_stan, here(path_name))
 }
-
-
 # Write out needed files --------------------------------------------------
 
-saveRDS(xmat_all, here("DataProcessed.nosync/occurrence/xmat_all.rds"))
-saveRDS(occ_data, here("DataProcessed.nosync/results/occ_data.rds"))
+saveRDS(xmat_all, here("DataProcessed.nosync/results/stan/full/xmat_all.rds"))
+saveRDS(occ_data, here("DataProcessed.nosync/results/stan/full/occ_data.rds"))
 st_write(nw_grid_all, here("DataProcessed.nosync/occurrence/nw_grid_all.shp"), append = F)
 
+print(Sys.time())
