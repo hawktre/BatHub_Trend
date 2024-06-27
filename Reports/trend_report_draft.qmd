@@ -11,6 +11,7 @@ author:
     affiliation: National Park Service
     degrees: PhD
 format: html
+embed-resources: true
 toc: true
 code-fold: true
 execute: 
@@ -51,7 +52,7 @@ exclude <- c("tabr", "pahe", "euma")
 
 # Introduction
 
-This purpose of this report is to document progress toward an occupancy trend analysis for bat species of the Pacific Northwest. Previously, the Northwestern Bat Hub for Population Monitoring and Research (NW Bat Hub) and its partners have documented evidence a region-wide decline for Hoary Bats between 2016 and 2018 @rodhouse2019. Since publication of this research, the bat hub has continued population research and monitoring under North American Bat Program (NABat) summer-monitoring protocols and has since grown to include surveys in all of Oregon, Washington, and Idaho. Here, we present the preliminary results of an updated analysis including data from 2016-2022 for all of the NABat sample units encompassed by Oregon, Washington, and Idaho.
+This purpose of this report is to document progress toward an occupancy trend analysis for bat species of the Pacific Northwest. Previously, the Northwestern Bat Hub for Population Monitoring and Research (NW Bat Hub) and its partners have documented evidence of a region-wide decline for Hoary Bats between 2016 and 2018 [@rodhouse2019]. Since publication of this research, the bat hub has continued population research and monitoring under North American Bat Program (NABat) summer-monitoring protocols and has since grown to include surveys in all of Oregon, Washington, and Idaho. Here, we present the preliminary results of an updated analysis including data from 2016-2022 for all of the NABat sample units encompassed by Oregon, Washington, and Idaho.
 
 # Methods
 
@@ -73,16 +74,16 @@ First, we have a true underlying occupancy status $Z_{it}$ at site $i$ and year 
 
 $$Z_{it} \sim \text{Bernoulli}(\psi_{it}),$$
 
-Furthermore, we assume that the parameter $\psi_{it}$ can be partially explained by a set of environmental covariates $\bf{x}$ (@tbl-covars) for which we will estimate an effect $\alpha$. We will also allow the probability of occupancy to vary between years and to be influenced by the status of the previous year by including the autoregressive parameter $\alpha_{auto}$.\
+Furthermore, we assume that the parameter $\psi_{it}$ can be partially explained by a set of environmental covariates, $\bf{x}$ (@tbl-covars), for which we will estimate an effect $\alpha$. We will also allow the probability of occupancy to vary between years and to be influenced by the status of the previous year by including the autoregressive parameter $\alpha_{auto}$.\
 $$\text{logit}(\psi_{i1}) = \alpha_{01} + {\bf x}_i\alpha,$$ $$\text{logit}(\psi_{it}) = \alpha_{02} + {\bf x}_i\alpha + Z_{i(t-1)}\alpha_{auto}\text{ for }t \in \{2,\ldots,T\},$$
 
-Finally, we have a detection sub-model which estimates the conditional probability that we detected a bat species ($p_{ijt}$) at site $i$ and replicate $j$ on year $t$ given that site $i$ was occupied at year $t$. We assume that $p_{ijt}$ arises from a similar probability distribution and may also be explained by some environmental covariates $\bf{v}$, for which we wish to estimate effects $\bf{\beta}$.\
+Finally, we have a detection sub-model which estimates the conditional probability that we detected a bat species ($p_{ijt}$) at site $i$ and replicate $j$ on year $t$ given that site $i$ was occupied at year $t$. We assume that $p_{ijt}$ arises from a similar probability distribution and may also be explained by some environmental covariates $\bf{v}$, for which we wish to estimate effects ($\bf{\beta}$).\
 $$[Y_{ijt} \mid Z_{it}=1] \sim \text{Bernoulli}(p_{ijt})$$ $$\text{logit}(p_{ijt}) = \beta_0 + {\bf v}_{ijt}\beta,$$
 
 A full summary of these parameters is provided in @tbl-params and environmental covariates in @tbl-covars. For the purpose of this report, we are most interested in reviewing the posterior probability of occupancy ($\psi_{it}$), effect estimates for occupancy environmental covariates ($\bf{\alpha}$), and effect estimates for detection environmental covariates $\bf{\beta}$. All models were fit in the STAN programming language and model parameters extracted using `rstan` ver. `r packageVersion("rstan")`.
 
 | Parameter       | Description                                                                                                                   |
-|------------------|------------------------------------------------------|
+|-----------------|-------------------------------------------------------------------------------------------------------------------------------|
 | $\psi_{it}$     | Posterior occupancy probability for site $i$ at time $t$                                                                      |
 | $\alpha_{01}$   | Occupancy model intercept at year $t = 1$                                                                                     |
 | $\alpha_{02}$   | Occupancy model intercept at year $t = 2, \ldots, T$                                                                          |
@@ -98,7 +99,7 @@ A full summary of these parameters is provided in @tbl-params and environmental 
 
 ::: {#tbl-covars layout-ncol="1"}
 | Name               | Description                                                          |
-|-----------------|-------------------------------------------------------|
+|--------------------|----------------------------------------------------------------------|
 | Forest Cover (%)   | Percentage of the sample unit that classified as forest cover (NLCD) |
 | Precipitation (mm) | Mean annual precipitation (WorldClim)                                |
 | Cliff Cover (%)    | Percentage of the sample unit classified as cliff cover (LandFire)   |
@@ -106,7 +107,7 @@ A full summary of these parameters is provided in @tbl-params and environmental 
 : Environmental covariates included in the occupancy sub-model. {#tbl-occ}
 
 | Name                | Description                                                                  |
-|-------------------|-----------------------------------------------------|
+|---------------------|------------------------------------------------------------------------------|
 | Minimum Temperature | Minimum temperature ($C^{\circ}$) on the night of detector deployment        |
 | Day Length          | Day length (previous day) on the night of deployment                         |
 | Clutter (%)         | Categorical clutter (0 = 0%; 1 = 1-25%; 2 = 26-50%; 3 = 51-75%; 4 = 76-100%) |
@@ -127,7 +128,7 @@ Previous studies released by the NW Bat Hub and its partners have focused on aco
 n_sites <- as.numeric(length(unique(occ_map$anpa$means_map_long$cell[occ_map$anpa$means_map_long$sampled == 1])))
 ```
 
-A total of `r n_sites` independent cells were included across the seven year period from 2016 to 2022 [@tbl-surveys; @fig-samples]
+A total of `r n_sites` independent cells were included across the seven year period from 2016 to 2022 (@tbl-surveys; @fig-samples).
 
 ```{r}
 #| label: tbl-surveys
@@ -172,7 +173,7 @@ occ_map$anpa$means_map_long %>%
 
 @fig-alphas gives summaries of the posterior distributions for each environmental covariate from the occupancy sub-model, for each species included in the analysis. Please note that these results are preliminary and are subject to change.
 
-```{r, fig.height=12, fig.width=8}
+```{r, fig.height=8, fig.width=8}
 #| label: fig-alphas
 #| fig-cap: "Summary of posterior distributions for occupancy model covariates, by species. Point locations represent the posterior means, colored regions represent the 50% credible interval, and black lines represent the 95% credible interval. Outputs provided on the log-odds scale."
 
@@ -180,7 +181,9 @@ occ_map$anpa$means_map_long %>%
 alpha_summ <- alpha_summ %>% mutate(analysis = "OR|WA|ID")
 alpha_summ_sens <- alpha_summ_sens %>% mutate(analysis = "OR|WA Only")
 
-alpha_full <- bind_rows(alpha_summ, alpha_summ_sens)
+alpha_full <- bind_rows(alpha_summ, alpha_summ_sens) 
+
+
   
 alpha_full %>% 
   filter(!(alpha %in% c("int01", "int02", "alpha_auto")),
@@ -208,9 +211,11 @@ ggplot(aes(x = spp, y = mean, group = analysis))+
 
 ```
 
+@fig-alphas shows stable estimates with the exception of some large values from the posterior distribution of the coefficient for precipitation for models of the california myotis (MYCA) and the little brown bat (MYLU). Estimates are reported on the log-odds scale and can be generally be interpreted as "a change of 1 standard deviation in X is associated with an increase of Y in the log-odds of occupancy".
+
 @fig-betas gives summaries of the posterior distributions for each environmental covariate from the detection sub-model, for each species included in the analysis. Again, please note that these results are preliminary and are subject to change.
 
-```{r}
+```{r fig.height=8, fig.width=8}
 #| label: fig-betas
 #| fig-cap: "Summary of posterior distributions for detection model covariates, by species. Point locations represent the posterior means, colored regions represent the 50% credible interval, and black lines represent the 95% credible interval. Outputs provided on the log-odds scale."
 #Betas
@@ -241,6 +246,8 @@ ggplot(aes(x = spp, y = mean, group = analysis))+
           'Single-season, multi-species model')+
   labs(color = "Legend") 
 ```
+
+@fig-betas again shows stable estimates for model coefficients across species. These results may also be interpreted as "a change of 1 standard deviation in X is associated with an increase of Y in the log-odds of detection, given that the species is present."
 
 ### Posterior Predictions
 
@@ -295,8 +302,78 @@ ggplot(aes(x = years, y = mean_psi, group = analysis))+
   labs(color = "Legend") 
 ```
 
-Maps of the posterior predictions displayed in @fig-psi are included with this report and visualize the mean and 95% credibile intervals of the posterior distribution of $\hat{\psi_t}$.
+### Occupancy maps
+
+Maps of the posterior predictions for all species displayed in @fig-psi are included with this report and visualize the mean and 95% credibile intervals of the posterior distribution of $\hat{\psi_t}$. @fig-psimap gives an example of the map for mean posterior occupancy probabilities and @fig-psici displays uncertainty around those means. Interestingly, uncertainty is consistently high in the Hell's Canyon wilderness region— a rugged and remote region that has not been yet been captured by monitoring efforts. An overlay of sampling effort with uncertainty is shown in @fig-psisamp.
+
+```{r fig.width=8}
+#| label: fig-psimap
+#| fig-cap: "Mean posterior occupancy probabilities visualized for the small-footed bat. Cool colors indicate low probability of occurrence on year *t* and warm colors indicate a high probability."
+
+occ_map$myci$means_map_long %>% 
+    ggplot()+
+    geom_sf(aes(fill = mean), size = 0.1, lwd = 0.05) +
+    facet_wrap(. ~ years, ncol = 4) +
+    viridis::scale_fill_viridis(limits = c(0, 1)) +
+    theme(axis.text.x = element_blank(),
+          axis.text.y = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.y = element_blank(),
+          legend.position = "bottom")+
+    ggtitle('MYCI Posterior Mean Occupancy',
+            'Multi-season, single-species model')+
+  labs(fill = "Posterior Mean Occ.")
+
+```
+
+```{r fig.width=8}
+#| label: fig-psici
+#| fig-cap: "95% credible interval of posterior occupancy probabilities visualized for the small-footed bat. Warm colors indicate higher uncertainty."
+occ_map$myci$ci_map_long %>% 
+    ggplot()+
+    geom_sf(aes(fill = width), size = 0.1, lwd = 0.05) +
+    facet_wrap(. ~ years, ncol = 4) +
+    viridis::scale_fill_viridis(limits = c(0, 1)) +
+    theme(axis.text.x = element_blank(),
+          axis.text.y = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.y = element_blank(),
+          legend.position = "bottom")+
+    ggtitle('MYCI Posterior 95% Credible Interval (Width)',
+            'Multi-season, single-species model')+
+  labs(fill = "95% CI")
+```
+
+```{r fig.width=8}
+#| label: fig-psisamp
+#| fig-cap: "Model uncertainty (95% Credible Interval) overlayed with sampling efforts"
+occ_map$myci$ci_map_long %>% 
+  mutate(sampled = factor(sampled, labels = c("No", "Yes"))) %>% 
+    ggplot()+
+    geom_sf(aes(fill = width, color = sampled), size = 0.05, lwd = 1)+ 
+    facet_wrap(. ~ years, ncol = 4) +
+    viridis::scale_fill_viridis(limits = c(0, 1)) +
+  scale_color_discrete(type = c("transparent", "red"))+
+    theme(axis.text.x = element_blank(),
+          axis.text.y = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.y = element_blank(),
+          legend.position = "bottom")+
+    ggtitle('MYCI Posterior 95% Credible Interval (Width)',
+            'Multi-season, single-species model')+
+  labs(fill = "95% CI",
+       color = "Sampled")
+```
 
 # Discussion
 
-This analysis is still in progress, but highlights some key
+This report represents a significant update to monitoring of regional trends for bat species of the pacific northwest. Further model validation strategies are required in order to make sound inference about occupancy trends for these species. Next steps are to validate posterior estimates against models fit in JAGS, another Bayesian modeling framework, and to calculate a rate of decline for each species ($\lambda$). Parameter estimates from this report indicate that posterior estimates may benefit from additional transformations of model covariates.
+
+# Acknowledgements
+
+The Northwest Bat Hub thanks its contributing partners for their continued support to better understand regional status and trends of bats in the Pacific Northwest.
+
+# References
+
+::: {#refs}
+:::
