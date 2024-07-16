@@ -47,7 +47,7 @@ alpha_summ_sens <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/alp
 beta_summ_sens <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/beta_summ.rds"))
 
 ## define some species we will exclude
-exclude <- c("tabr", "pahe", "euma")
+exclude <- c("tabr")
 ```
 
 # Introduction
@@ -64,7 +64,7 @@ We queried data from NW Bat Hub database files for all included up to the time o
 
 Briefly, NABat uses a spatial grid covering the continental United States in 10x10 km sample units—hereto referred to as "grid cells" or simply "cells"— with an ordered sampling priority in order to ensure a spatially balanced sample that meets statistical modeling assumptions. The current monitoring protocol utilized by the NW Bat Hub calls for one night of acoustic monitoring at each of four spatial replicates within a cell during the summer season. Ideally, each of the spatial replicates are distributed to one of the inter-cardinal 5x5 km quadrants (NE, NW, SE, SW) of a cell, but when this is not possible multiple detectors may be deployed in a single quadrant. The current modeling strategy is also flexible to \>4 spatial replicates, but is not required. In instances where detectors were deployed for \>1 night, only the first night was subsetted for analysis.
 
-The Canyon Bat (*Parastrellis hesperus*), the Mexican Free-tailed Bat (*Tadarida brasiliensis*), and the Spotted Bat (*Euderma maculatum*) have been removed from this analysis due to small sample size or limited range.
+The Mexican Free-tailed Bat (*Tadarida brasiliensis*) has been removed from this analysis due to small sample size or limited range.
 
 ## The Model
 
@@ -259,6 +259,7 @@ ggplot(aes(x = spp, y = mean, group = analysis))+
 psi_summ <- function(occ_map){
   for (i in 1:length(occ_map)) {
   psi_temp <- occ_map[[i]]$means_map_long%>% 
+    filter(sampled == 1) %>% 
     as.data.frame() %>% 
     group_by(years) %>% 
     summarise(mean_psi = mean(mean),
@@ -297,7 +298,7 @@ ggplot(aes(x = years, y = mean_psi, group = analysis))+
   facet_grid(spp ~ .) +
   xlab('Species') + 
   ylab(TeX("$\\hat{psi}$")) +
-  ggtitle('Comparing detection coefficients (Mean & 95% CI)',
+  ggtitle('Comparing posterior occupancy estimates (Mean & 95% CI)',
           'Single-season, multi-species model')+
   labs(color = "Legend") 
 ```
@@ -333,7 +334,7 @@ occ_map$myci$ci_map_long %>%
     ggplot()+
     geom_sf(aes(fill = width), size = 0.1, lwd = 0.05) +
     facet_wrap(. ~ years, ncol = 4) +
-    viridis::scale_fill_viridis(limits = c(0, 1)) +
+    viridis::scale_fill_viridis(limits = c(0, 1), option = "magma") +
     theme(axis.text.x = element_blank(),
           axis.text.y = element_blank(),
           axis.ticks.x = element_blank(),
@@ -352,7 +353,7 @@ occ_map$myci$ci_map_long %>%
     ggplot()+
     geom_sf(aes(fill = width, color = sampled), size = 0.05, lwd = 1)+ 
     facet_wrap(. ~ years, ncol = 4) +
-    viridis::scale_fill_viridis(limits = c(0, 1)) +
+    viridis::scale_fill_viridis(limits = c(0, 1), option = "magma") +
   scale_color_discrete(type = c("transparent", "red"))+
     theme(axis.text.x = element_blank(),
           axis.text.y = element_blank(),

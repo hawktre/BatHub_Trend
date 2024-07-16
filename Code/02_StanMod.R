@@ -199,14 +199,14 @@ for (i in 1:length(occ_data)) {
   # Fit occupancy model in Stan
   occ_stan <- rstan::sampling(object = docc_model1,
                        data = occ_data[[i]])
-  path_name <- paste0("DataProcessed.nosync/results/stan/full/fits/",names(occ_data)[i], "_stan.rds")
+  path_name <- paste0("DataProcessed.nosync/results/stan/",names(occ_data)[i], "_stan.rds")
   
   saveRDS(occ_stan, here(path_name))
 }
 # Write out needed files --------------------------------------------------
 
-saveRDS(xmat_all, here("DataProcessed.nosync/results/stan/full/xmat_all.rds"))
-saveRDS(occ_data, here("DataProcessed.nosync/results/stan/full/occ_data.rds"))
+saveRDS(xmat_all, here("DataProcessed.nosync/occurrence/xmat_all.rds"))
+saveRDS(occ_data, here("DataProcessed.nosync/results/occ_data.rds"))
 st_write(nw_grid_all, here("DataProcessed.nosync/occurrence/nw_grid_all.shp"), append = F)
 
 print(Sys.time())
