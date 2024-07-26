@@ -48,11 +48,11 @@ nabat_pnw <- nabat_covars %>%
 
 plot(nabat_pnw['admin1'])
 
-pnw_shp <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE)) %>% 
-  filter(ID %in% c("oregon", "washington", "idaho")) %>% 
-  st_transform(st_crs(nabat_pnw))
-
-nabat_pnw <- nabat_pnw[pnw_shp,]
+# pnw_shp <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE)) %>% 
+#   filter(ID %in% c("oregon", "washington", "idaho")) %>% 
+#   st_transform(st_crs(nabat_pnw))
+# 
+# nabat_pnw <- nabat_pnw[pnw_shp,]
 # Join to get CONUS -------------------------------------------------------
 
 conus_grts_key <- conus10k %>% 
@@ -102,3 +102,9 @@ covars <- covars %>%
 
 # Write out the results ---------------------------------------------------
 write_sf(covars, here("DataProcessed.nosync/occurrence/batgrid_covars.shp"))
+
+raw.occ.prob <- apply(bat.dat$y['epfu',,,], 2, mean, na.rm = TRUE)
+plot(2016:2022, raw.occ.prob, pch = 16, 
+     xlab = 'Year', ylab = 'Raw Occurrence Proportion', 
+     cex = 1.5, frame = FALSE, ylim = c(0, 1))
+plot(covars)
