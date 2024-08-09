@@ -33,12 +33,8 @@ library(spOccupancy)
 
 # Read in the data --------------------------------------------------------
 bat.dat <- readRDS(here("DataProcessed.nosync/spOccupancy/bat_dat.rds"))
-all.fits <- readRDS(here("DataProcessed.nosync/spOccupancy/all_fits.rds"))
 dets.sp <- read_sf(here("DataProcessed.nosync/spOccupancy/spatial_dets.shp"))
 
-# Subset fits to work with just one ---------------------------------------
-
-spp <- names(all.fits)
 
 # Trace Plots -------------------------------------------------------------
 trc_plt <- function(fit, spp){
@@ -46,6 +42,7 @@ trc_plt <- function(fit, spp){
   #Extract occurrence mod samples
   occ.samps <- as.data.frame(fit$beta.samples)
   det.samps <- as.data.frame(fit$alpha.samples)
+  
   #Extract posterior sample index and chain
   ## Occurrence
   occ.samps$x <- rep(1:(nrow(occ.samps)/n.chains), n.chains)
@@ -304,9 +301,16 @@ covars_summary <- function(fit, spp){
   occ_quantiles <- as.data.frame(matrix(NA, ncol(occ.samps),6)) 
   colnames(occ_quantiles) <- c("covariate", "mean", "q2.5", "q25", "q75", "q97.5") 
   occ_quantiles$covariate <- colnames(occ.samps)
+  if(spp %in% c("anpa", "euma", "myci", "pahe")){
   occ_quantiles$covariate <- c(
-    "(Intercept)", "Year", "Elevation", "Forest Cover", "Temp", "precip"
+    "(Intercept)" , "Year", "Forest Cover", "Precipitation","Cliff/Canyon Cover", "Elevation"
   )
+  }
+  else{
+    occ_quantiles$covariate <- c(
+      "(Intercept)" , "Year", "Forest Cover", "Precipitation", "Elevation"
+    )
+  }
   occ_quantiles$mean <- colMeans(occ.samps)
   occ_quantiles[,3:6] <- t(apply(occ.samps ,2,quantile,probs=c(0.025, 0.25, 0.75, 0.975)))
   occ_quantiles <- occ_quantiles %>% mutate(type = "Occurrence",
@@ -323,25 +327,212 @@ covars_summary <- function(fit, spp){
   return(bind_rows(occ_quantiles, det_quantiles))
 }
 
-fit.summary <- lapply(1:length(all.fits), function(x){
-  #define our species 
-  spp <- names(all.fits)
+# Occurrence Residuals ----------------------------------------------------
+
+occ_binned <- function( out, #fitted model output to get residuals from
+                        cov_vec, #covariates from the data (just surveyed site-nights)
+                        numbins,
+                        niter){ # the number of randomly selected MCMC samples
+  # create storage
+  out_ <- list()
   
-  #subset the current fit
-  cur.fit <- all.fits[[x]]
+  # select iterations
+  iters <- sample(1:nrow(out$z.samples), size = niter, replace = F)
+  
+  # loop through iterations
+  for(ndx in 1:niter){
+    iter_ <- iters[ndx]
+    
+    # construct replicated z vector
+    z.rep <- out$z.samples[iter_,,] %>% as.vector() # samples of latent z state across all sites
+    psi <- out$psi.samples[iter_,,] %>% as.vector()# samples of latent psi across all sites 
+    #remember that model output and data are ordered to match. 
+    
+    # get residual at one mcmc sample:
+    resid_raw_occ <- as.numeric(z.rep - psi)    
+    
+    ### now do binned residuals at that iteration: 
+    
+    #in each bin we have:
+    binsize <- floor(length(psi)/numbins) 
+    bin <- rep(1:numbins, each = binsize)
+    leftover <- length(psi)%%numbins # with some leftover (why they're approx equal sized 
+    # groups) which will be added to the first group
+    #(adding to first groups because anticipating having big zero groups)
+    if (leftover > 0) {bin <- c(rep(1, leftover), bin)} #add leftover to first group 
+    
+    # put it in a table so that each covariate value is staying with it's residual:
+    binned <- as.data.frame(cbind(psi, resid_raw_occ, cov_vec))
+    
+    # 1) order the covariates (or in this case the psi)
+    binned <- binned %>% arrange(psi)
+    # 2) sort into bins with approx equal number of points in each 
+    binned$bin <- bin
+    # 3) average within the bins 
+    df <- aggregate(x = binned, by = list(binned$bin), FUN = mean)    
+    df$sample <- iter_
+    
+    ## store: 
+    out_[[ndx]] <- tibble(
+      bin = df$bin,
+      psi = df$psi,
+      cov_vec = df$cov_vec,
+      resid_raw = df$resid_raw_occ,
+      Iteration = df$sample) 
+  }
+  
+  return(do.call("rbind", out_))
+}
+
+
+occ.covnames <- names(bat.dat$occ.covs)[c(2:5, 7)]
+for (i in 1:length(occ.covnames)) {
+  cov_vec <- bat.dat$occ.covs[[occ.covnames[i]]]
+  if(occ.covnames[i] == "year"){
+    cov_vec <- cov_vec %>% as.vector()
+  }
+  else{
+  cov_vec <- rep(cov_vec, 7)
+  }
+  print(ggplot( occ_binned(all.fits$anpa, cov_vec,100, 6) ) +
+    geom_point(aes(x = cov_vec, y = resid_raw), color = "blue") + geom_hline(yintercept = 0, lty = 2) +
+    theme_bw() +
+    facet_wrap(~ Iteration, labeller = "label_both") +
+    labs( y = "Binned occurrence residuals", x = occ.covnames[[i]],
+          title = as.character(occ.covnames[i])))
+}
+
+
+
+files <- list.files(path = here("DataProcessed.nosync/spOccupancy/fits/"))
+
+covars <- list()
+
+for (i in 1:length(files)){
+  spp <- str_split(files, "_")[[i]][[1]]
+  
+  cur.fit <- readRDS(here(paste0("DataProcessed.nosync/spOccupancy/fits/", files[i])))
+  
   
   #traceplots
-  trc_plt(cur.fit, spp[x])
+  trc_plt(cur.fit, spp)
   
-  #Morans (occurrence)
-  morans.occ <- morans_occ(cur.fit, bat.dat, niter = 100)
-  morans_plt(morans.occ, type = "Occurrence", spp = spp[x])
-  #Morans (detections)
-  morans.det <- morans_det(cur.fit, spp[x], dets.sp, 100)
-  morans_plt(morans.det, type = "Detection", spp = spp[x])
   
-  covars <- covars_summary(cur.fit, spp[x])
+  # #Morans (occurrence)
+  # morans.occ <- morans_occ(cur.fit, bat.dat, niter = 100)
+  # morans_plt(morans.occ, type = "Occurrence", spp = spp)
+  # #Morans (detections)
+  # morans.det <- morans_det(cur.fit, spp, dets.sp, 100)
+  # morans_plt(morans.det, type = "Detection", spp = spp)
   
-  return(covars)
-})
+  
+  covars[[i]] <- covars_summary(cur.fit, spp)
+  
+}
+
+covars.full <- bind_rows(covars)
+
+saveRDS(covars.full, here("DataProcessed.nosync/spOccupancy/covars_summary.rds"))
+
+
+# Plot Covariates ---------------------------------------------------------
+
+occ_plt <- covars.full %>% 
+  filter(type == "Occurrence") %>% 
+  ggplot(aes(x = spp, y = mean))+
+  geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, size = 0.75,
+                position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q25, ymax = q75, colour = spp), width = 0,
+                size = 1.5, position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  theme_bw() +
+  facet_grid(covariate ~ ., scales = 'free') +
+  geom_hline(yintercept = 0, lty = 2) +
+  xlab('Species') + 
+  ylab('Posterior Distribution (Log-Odds)') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        axis.text.y = element_text(size = 10)) +
+  ggtitle('Comparing occupancy coefficients (Mean & 95% CI)',
+          'Single-season, multi-species model')+
+  labs(color = "Legend") 
+
+ggsave(filename = "all_occ_covars.png", plot = occ_plt, path = here("Reports/spOccupancy/figures/covariates/occurrence/"), width = 3024, height = 1964, units = "px")
+
+det_plt <- covars.full %>% 
+  filter(type == "Detection") %>% 
+  ggplot(aes(x = spp, y = mean))+
+  geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, size = 0.75,
+                position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q25, ymax = q75, colour = spp), width = 0,
+                size = 1.5, position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  theme_bw() +
+  facet_grid(covariate ~ ., scales = 'free') +
+  geom_hline(yintercept = 0, lty = 2) +
+  xlab('Species') + 
+  ylab('Posterior Distribution (Log-Odds)') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        axis.text.y = element_text(size = 10)) +
+  ggtitle('Comparing detection coefficients (Mean & 95% CI)',
+          'Single-season, multi-species model')+
+  labs(color = "Legend") 
+
+ggsave(filename = "all_det_covars.png", plot = det_plt, path = here("Reports/spOccupancy/figures/covariates/detection/"), width = 3024, height = 1964, units = "px")
+
+for (i in 1:length(files)){
+  spp <- str_split(files, "_")[[i]][[1]]
+  
+  cur.fit <- readRDS(here(paste0("DataProcessed.nosync/spOccupancy/fits/", files[i])))
+  
+  posterior_summary <- data.frame(mean = apply(cur.fit$psi.samples, c(2,3), mean) %>% colMeans(),
+                                  ci_2.5 = apply(cur.fit$psi.samples, c(2,3), quantile, probs = c(0.025)) %>% colMeans(),
+                                  ci_25 = apply(cur.fit$psi.samples, c(2,3), quantile, probs = c(0.25)) %>% colMeans(),
+                                  ci_75 = apply(cur.fit$psi.samples, c(2,3), quantile, probs = c(0.75)) %>% colMeans(),
+                                  ci_97.5 = apply(cur.fit$psi.samples, c(2,3), quantile, probs = c(0.975)) %>% colMeans(),
+                                  spp = spp,
+                                  year = rep(2016:2022)
+  )
+  
+  if(!exists("psi.hat")){
+    psi.hat <- posterior_summary
+  }
+  else{
+    psi.hat <- bind_rows(psi.hat, posterior_summary)
+  }
+}
+
+saveRDS(psi.hat, here("DataProcessed.nosync/spOccupancy/psi_hat.rds"))
+
+for (i in unique(covars.full$spp)) {
+  occ_plt <- covars.full %>% 
+    filter(type == "Occurrence", spp == i) %>% 
+    ggplot(aes(x = covariate, y = mean))+
+    geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, linewidth = 0.6)+
+    geom_errorbar(aes(ymin = q25, ymax = q75, color = covariate), width = 0, linewidth = 1.5, show.legend = F)+
+    geom_point()+
+    theme_bw()+
+    geom_hline(yintercept = 0, lty = 2, linewidth = 0.3)+
+    xlab('Covariate')+
+    ylab('Posterior Distribution')+
+    ggtitle(paste0('Occurrence Coefficients (', toupper(i),')'),
+            'Multi-season, Single-species model')
+  
+  ggsave(filename = paste0(i, "_occ_covars.png"), plot = occ_plt, path = here("Reports/spOccupancy/figures/covariates/occurrence/"), width = 3024, height = 1964, units = "px")
+  
+  det_plt <- covars.full %>% 
+    filter(type == "Detection", spp == i) %>% 
+    ggplot(aes(x = covariate, y = mean))+
+    geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, linewidth = 0.6)+
+    geom_errorbar(aes(ymin = q25, ymax = q75, color = covariate), width = 0, linewidth = 1.5, show.legend = F)+
+    geom_point()+
+    theme_bw()+
+    geom_hline(yintercept = 0, lty = 2, linewidth = 0.3)+
+    xlab('Covariate')+
+    ylab('Posterior Distribution')+
+    ggtitle(paste0('Detection Coefficients (', toupper(i),')'),
+            'Multi-season, Single-species model')
+  
+  ggsave(filename = paste0(i, "_det_covars.png"), plot = det_plt, path = here("Reports/spOccupancy/figures/covariates/detection/"), width = 3024, height = 1964, units = "px")
+  
+}
 

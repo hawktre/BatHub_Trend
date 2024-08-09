@@ -141,12 +141,19 @@ nw_grid_all <- rbind(nw_grida, nw_gridb)
 xmat_all <- nw_grid_all %>%
   st_drop_geometry() %>%
   mutate(log_fc = log(p_forest + 1)) %>% 
-  select(log_fc, precip, cliff_cover) %>%
+  select(log_fc, precip, DEM_max) %>%
   scale()
 
 xmata <- xmat_all[which(nw_grid_all$samp_all == 1), ]
 xmatb <- xmat_all[which(nw_grid_all$samp_all == 0), ]
 
+xmat_cliff <- nw_grid_all %>%
+  st_drop_geometry() %>%
+  mutate(log_fc = log(p_forest + 1)) %>% 
+  select(log_fc, precip, DEM_max, cliff_cover) %>%
+  scale()
+xmatc <- xmat_cliff[which(nw_grid_all$samp_all == 1), ]
+xmatd <- xmat_cliff[which(nw_grid_all$samp_all == 0), ]
 # Setup remaining Stan data. ----------------------------------------------
 
 #Setup some of the Stan data.
@@ -176,18 +183,34 @@ for (i in possible_bats) {
   naiveb[which(n_visits_vec == 0)] <- 0
   naive_occ <- naiveb
   
-  occ_data[[i]] <- list('n_sites_total' = n_sites_total,
-                   'n_site_years' = n_site_years,
-                   'n_years' = n_years,
-                   'n_obs' = n_obs,
-                   'dets' = dets,
-                   'n_visits' = n_visits_vec,
-                   'naive_ind' = naive_occ,
-                   'n_covs1' = n_xcovs,
-                   'xmat' = xmata,
-                   'n_covs2' = n_vcovs,
-                   'vmat' = vmat)
+  if (i %in% c("anpa", "euma", "myci", "pahe")) {
+    occ_data[[i]] <- list('n_sites_total' = n_sites_total,
+                          'n_site_years' = n_site_years,
+                          'n_years' = n_years,
+                          'n_obs' = n_obs,
+                          'dets' = dets,
+                          'n_visits' = n_visits_vec,
+                          'naive_ind' = naive_occ,
+                          'n_covs1' = n_xcovs,
+                          'xmat' = xmatc,
+                          'n_covs2' = n_vcovs,
+                          'vmat' = vmat)
+  }
+  else{occ_data[[i]] <- list('n_sites_total' = n_sites_total,
+                             'n_site_years' = n_site_years,
+                             'n_years' = n_years,
+                             'n_obs' = n_obs,
+                             'dets' = dets,
+                             'n_visits' = n_visits_vec,
+                             'naive_ind' = naive_occ,
+                             'n_covs1' = n_xcovs,
+                             'xmat' = xmata,
+                             'n_covs2' = n_vcovs,
+                             'vmat' = vmat)}
+  
 }
+
+occ_data$laci
 
 # Fit the stan model ------------------------------------------------------
 ## Load the model
