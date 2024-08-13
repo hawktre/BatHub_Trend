@@ -46,11 +46,11 @@ trc_plt <- function(fit, spp){
   #Extract posterior sample index and chain
   ## Occurrence
   occ.samps$x <- rep(1:(nrow(occ.samps)/n.chains), n.chains)
-  occ.samps$chain <- as.factor(rep(1:3, each =nrow(occ.samps)/n.chains))
+  occ.samps$chain <- as.factor(rep(1:4, each =nrow(occ.samps)/n.chains))
   
   ## Detection
   det.samps$x <- rep(1:(nrow(det.samps)/n.chains), n.chains)
-  det.samps$chain <- as.factor(rep(1:3, each =nrow(det.samps)/n.chains))
+  det.samps$chain <- as.factor(rep(1:4, each =nrow(det.samps)/n.chains))
   
   # convert to long for plotting
   ## Occurrence
@@ -386,21 +386,21 @@ occ_binned <- function( out, #fitted model output to get residuals from
 
 
 occ.covnames <- names(bat.dat$occ.covs)[c(2:5, 7)]
-for (i in 1:length(occ.covnames)) {
-  cov_vec <- bat.dat$occ.covs[[occ.covnames[i]]]
-  if(occ.covnames[i] == "year"){
-    cov_vec <- cov_vec %>% as.vector()
-  }
-  else{
-  cov_vec <- rep(cov_vec, 7)
-  }
-  print(ggplot( occ_binned(all.fits$anpa, cov_vec,100, 6) ) +
-    geom_point(aes(x = cov_vec, y = resid_raw), color = "blue") + geom_hline(yintercept = 0, lty = 2) +
-    theme_bw() +
-    facet_wrap(~ Iteration, labeller = "label_both") +
-    labs( y = "Binned occurrence residuals", x = occ.covnames[[i]],
-          title = as.character(occ.covnames[i])))
-}
+# for (i in 1:length(occ.covnames)) {
+#   cov_vec <- bat.dat$occ.covs[[occ.covnames[i]]]
+#   if(occ.covnames[i] == "year"){
+#     cov_vec <- cov_vec %>% as.vector()
+#   }
+#   else{
+#   cov_vec <- rep(cov_vec, 7)
+#   }
+#   print(ggplot( occ_binned(all.fits$anpa, cov_vec,100, 6) ) +
+#     geom_point(aes(x = cov_vec, y = resid_raw), color = "blue") + geom_hline(yintercept = 0, lty = 2) +
+#     theme_bw() +
+#     facet_wrap(~ Iteration, labeller = "label_both") +
+#     labs( y = "Binned occurrence residuals", x = occ.covnames[[i]],
+#           title = as.character(occ.covnames[i])))
+# }
 
 
 

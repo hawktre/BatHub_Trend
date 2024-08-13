@@ -21,6 +21,7 @@ code-links:
     href: https://github.com/hawktre/BatHub_Trend.git
 page-layout: full
 bibliography: references.bib
+execute-dir: 
 ---
 
 ```{r}
@@ -31,6 +32,9 @@ library(sf)
 library(rstan)
 library(gt)
 library(kableExtra)
+
+setwd("/Users/trentvanhawkins/Library/Mobile Documents/com~apple~CloudDocs/Documents/OnBelay/Projects/BatHub/BatHub_Trend")
+
 # Read in Data
 ## Full 
 occ_map <- readRDS(here("DataProcessed.nosync/results/stan/full/occ_map.rds"))
@@ -45,6 +49,9 @@ occ_map_sens <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/occ_ma
 alpha_summ_sens <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/alpha_summ.rds"))
 
 beta_summ_sens <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/beta_summ.rds"))
+
+## spOccupancy
+spOcc_summ <- readRDS(here("DataProcessed.nosync/spOccupancy/covars_summary.rds"))
 
 ## define some species we will exclude
 exclude <- c("tabr")
@@ -82,36 +89,60 @@ $$[Y_{ijt} \mid Z_{it}=1] \sim \text{Bernoulli}(p_{ijt})$$ $$\text{logit}(p_{ijt
 
 A full summary of these parameters is provided in @tbl-params and environmental covariates in @tbl-covars. For the purpose of this report, we are most interested in reviewing the posterior probability of occupancy ($\psi_{it}$), effect estimates for occupancy environmental covariates ($\bf{\alpha}$), and effect estimates for detection environmental covariates $\bf{\beta}$. All models were fit in the STAN programming language and model parameters extracted using `rstan` ver. `r packageVersion("rstan")`.
 
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | Parameter       | Description                                                                                                                   |
-|-----------------|-------------------------------------------------------------------------------------------------------------------------------|
++=================+===============================================================================================================================+
 | $\psi_{it}$     | Posterior occupancy probability for site $i$ at time $t$                                                                      |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | $\alpha_{01}$   | Occupancy model intercept at year $t = 1$                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | $\alpha_{02}$   | Occupancy model intercept at year $t = 2, \ldots, T$                                                                          |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | $\bf{\alpha}$   | Occupancy model effect size for environmental covariates                                                                      |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | $\bf{x}$        | Occupancy model environmental covariates [@tbl-occ].                                                                          |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | $\alpha_{auto}$ | Autoregressive parameter allowing for different occupancy probabilities on year $2,\ldots, T$                                 |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | $p_{ijt}$       | Conditional probability of species detection at site $i$ and replicate $j$ on year $t$ given site $i$ is occupied at year $t$ |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | $\beta_0$       | Detection model intercept                                                                                                     |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | $\bf{v}$        | Detection model environmental covariates [@tbl-det]                                                                           |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 | $\bf{\beta}$    | Detection model effect sizes for environmental covariates                                                                     |
++-----------------+-------------------------------------------------------------------------------------------------------------------------------+
 
 : Model parameters and descriptions. {#tbl-params}
 
 ::: {#tbl-covars layout-ncol="1"}
++--------------------+----------------------------------------------------------------------+
 | Name               | Description                                                          |
-|--------------------|----------------------------------------------------------------------|
++====================+======================================================================+
 | Forest Cover (%)   | Percentage of the sample unit that classified as forest cover (NLCD) |
++--------------------+----------------------------------------------------------------------+
 | Precipitation (mm) | Mean annual precipitation (WorldClim)                                |
++--------------------+----------------------------------------------------------------------+
+| Elevation (m)      | Maximum Elevation (DEM)                                              |
++--------------------+----------------------------------------------------------------------+
 | Cliff Cover (%)    | Percentage of the sample unit classified as cliff cover (LandFire)   |
+|                    |                                                                      |
+|                    | (Anpa, Euma, Myci, Pahe)                                             |
++--------------------+----------------------------------------------------------------------+
 
 : Environmental covariates included in the occupancy sub-model. {#tbl-occ}
 
++---------------------+------------------------------------------------------------------------------+
 | Name                | Description                                                                  |
-|---------------------|------------------------------------------------------------------------------|
++=====================+==============================================================================+
 | Minimum Temperature | Minimum temperature ($C^{\circ}$) on the night of detector deployment        |
++---------------------+------------------------------------------------------------------------------+
 | Day Length          | Day length (previous day) on the night of deployment                         |
++---------------------+------------------------------------------------------------------------------+
 | Clutter (%)         | Categorical clutter (0 = 0%; 1 = 1-25%; 2 = 26-50%; 3 = 51-75%; 4 = 76-100%) |
++---------------------+------------------------------------------------------------------------------+
 | Waterbody           | Presence of a waterbody at deployment site (1 = yes; 0 = no)                 |
++---------------------+------------------------------------------------------------------------------+
 
 : Environmental covariates included in the detection sub-model. {#tbl-det}
 
@@ -178,20 +209,40 @@ occ_map$anpa$means_map_long %>%
 #| fig-cap: "Summary of posterior distributions for occupancy model covariates, by species. Point locations represent the posterior means, colored regions represent the 50% credible interval, and black lines represent the 95% credible interval. Outputs provided on the log-odds scale."
 
 #Alphas
-alpha_summ <- alpha_summ %>% mutate(analysis = "OR|WA|ID")
-alpha_summ_sens <- alpha_summ_sens %>% mutate(analysis = "OR|WA Only")
+alpha_summ <- alpha_summ %>% mutate(analysis = "OR|WA|ID", model = "Stan") %>% select(-q50)
+alpha_summ_sens <- alpha_summ_sens %>% mutate(analysis = "OR|WA Only", model = "Stan") %>% select(-q50)
+alpha_spocc <- spOcc_summ %>% 
+  filter(type == "Occurrence") %>% 
+  rename("alpha" = covariate) %>% 
+  mutate(analysis = "OR|WA|ID",
+         model = "spOccupancy",
+         alpha = case_when(alpha == "Cliff/Canyon Cover" ~ "cliff_cover",
+                           alpha == "Year" ~ "year",
+                           alpha == "Forest Cover" ~ "forest_cover",
+                           alpha == "Precipitation" ~ "precip",
+                           alpha == "Elevation" ~ "elevation",
+                           T ~ alpha)) %>% 
+  select(spp, alpha, mean, q2.5, q25, q75, q97.5, analysis, model)
 
-alpha_full <- bind_rows(alpha_summ, alpha_summ_sens) 
+alpha_full <- bind_rows(alpha_summ, alpha_summ_sens, alpha_spocc) 
 
 
   
 alpha_full %>% 
-  filter(!(alpha %in% c("int01", "int02", "alpha_auto")),
-         !(spp %in% exclude)) %>% 
+  filter(!(alpha %in% c("int01", "int02", "alpha_auto", "(Intercept)")),
+         !(spp %in% exclude),
+         !model == "spOccupancy") %>% 
   mutate(spp = toupper(spp),
-         alpha = factor(alpha, labels = c("Forest Cover",
-                                          "Precipitation",
-                                          "Cliff Cover"))) %>%
+         alpha = factor(alpha, levels = c("forest_cover", 
+                                          "precip",
+                                          "elevation",
+                                          "cliff_cover",
+                                          "year"),
+                        labels = c("Forest Cover",
+                                    "Precipitation",
+                                    "Elevation",
+                                    "Cliff Cover",
+                                    "Year"))) %>%
 ggplot(aes(x = spp, y = mean, group = analysis))+
   geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, size = 0.75,
                 position = position_dodge(width = 0.5)) +
@@ -213,26 +264,96 @@ ggplot(aes(x = spp, y = mean, group = analysis))+
 
 @fig-alphas shows stable estimates with the exception of some large values from the posterior distribution of the coefficient for precipitation for models of the california myotis (MYCA) and the little brown bat (MYLU). Estimates are reported on the log-odds scale and can be generally be interpreted as "a change of 1 standard deviation in X is associated with an increase of Y in the log-odds of occupancy".
 
+```{r fig.height=8, fig.width=8}
+alpha_full %>% 
+  filter(!(alpha %in% c("int01", "int02", "alpha_auto", "(Intercept)")),
+         !(spp %in% exclude),
+         analysis != "OR|WA Only") %>% 
+  mutate(spp = toupper(spp),
+         alpha = factor(alpha, levels = c("forest_cover", 
+                                          "precip",
+                                          "elevation",
+                                          "cliff_cover",
+                                          "year"),
+                        labels = c("Forest Cover",
+                                    "Precipitation",
+                                    "Elevation",
+                                    "Cliff Cover",
+                                    "Year"))) %>%
+ggplot(aes(x = spp, y = mean, group = model))+
+  geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, size = 0.75,
+                position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q25, ymax = q75, color = model), width = 0,
+                size = 1.5, position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  theme_bw() +
+  facet_grid(alpha ~ ., scales = 'free') +
+  geom_hline(yintercept = 0, lty = 2) +
+  xlab('Species') + 
+  ylab('Posterior Distribution (Log-Odds)') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        axis.text.y = element_text(size = 10)) +
+  ggtitle('Comparing occupancy coefficients (Mean & 95% CI)',
+          'Single-season, multi-species model')+
+  labs(color = "Legend") 
+```
+
 @fig-betas gives summaries of the posterior distributions for each environmental covariate from the detection sub-model, for each species included in the analysis. Again, please note that these results are preliminary and are subject to change.
 
 ```{r fig.height=8, fig.width=8}
 #| label: fig-betas
 #| fig-cap: "Summary of posterior distributions for detection model covariates, by species. Point locations represent the posterior means, colored regions represent the 50% credible interval, and black lines represent the 95% credible interval. Outputs provided on the log-odds scale."
 #Betas
-beta_summ <- beta_summ %>% mutate(analysis = "OR|WA|ID")
-beta_summ_sens <- beta_summ_sens %>% mutate(analysis = "OR|WA Only")
+beta_summ <- beta_summ %>% mutate(analysis = "OR|WA|ID", model = "Stan")
+beta_summ_sens <- beta_summ_sens %>% mutate(analysis = "OR|WA Only", model = "Stan")
 
-beta_full <- bind_rows(beta_summ, beta_summ_sens) 
+beta_spocc <- spOcc_summ %>% 
+  filter(type == "Detection") %>% 
+  rename("betas" = covariate) %>% 
+  mutate(analysis = "OR|WA|ID",
+         model = "spOccupancy",
+         betas = case_when(betas == "dayl" ~ "daylight",
+                           betas == "(Intercept)" ~ "Intercept",
+                           T ~ betas)) %>% 
+  select(spp, betas, mean, q2.5, q25, q75, q97.5, analysis, model)
+
+beta_full <- bind_rows(beta_summ, beta_summ_sens, beta_spocc) 
 
 beta_full %>% 
   filter(!(betas %in% c("Intercept")),
-         !(spp %in% exclude)) %>% 
+         !(spp %in% exclude),
+         model != "spOccupancy") %>% 
   mutate(spp = toupper(spp),
          betas = factor(betas, labels = c("Min. Temp.", "Day Length", "Clutter", "Water"))) %>% 
 ggplot(aes(x = spp, y = mean, group = analysis))+
   geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, size = 0.75,
                 position = position_dodge(width = 0.5)) +
   geom_errorbar(aes(ymin = q25, ymax = q75, color = analysis), width = 0,
+                size = 1.5, position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  theme_bw() +
+  facet_grid(betas ~ ., scales = 'free') +
+  geom_hline(yintercept = 0, lty = 2) +
+  xlab('Species') + 
+  ylab('Posterior Distribution (Log-Odds)') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        axis.text.y = element_text(size = 10)) +
+  ggtitle('Comparing detection coefficients (Mean & 95% CI)',
+          'Single-season, multi-species model')+
+  labs(color = "Legend") 
+```
+
+```{r fig.height=8, fig.width=8}
+beta_full %>% 
+  filter(!(betas %in% c("Intercept")),
+         !(spp %in% exclude),
+         analysis != "OR|WA Only") %>% 
+  mutate(spp = toupper(spp),
+         betas = factor(betas, labels = c("Min. Temp.", "Day Length", "Clutter", "Water"))) %>% 
+ggplot(aes(x = spp, y = mean, group = model))+
+  geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, size = 0.75,
+                position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q25, ymax = q75, color = model), width = 0,
                 size = 1.5, position = position_dodge(width = 0.5)) +
   geom_point(position = position_dodge(width = 0.5)) +
   theme_bw() +
@@ -281,16 +402,49 @@ psi_summ <- function(occ_map){
 
 psi_full <- psi_summ(occ_map = occ_map) %>% mutate(analysis = "OR|WA|ID")
 psi_sens <- psi_summ(occ_map = occ_map_sens) %>% mutate(analysis = "OR|WA Only")
+psi_spocc <- readRDS(here("DataProcessed.nosync/spOccupancy/psi_hat.rds")) 
 
-all_psi <- bind_rows(psi_full, psi_sens)
+psi_spocc <- psi_spocc %>% select(year, mean, everything()) %>% mutate(analysis = "OR|WA|ID",
+                                                                       model = "spOccupancy",
+                                                                       year = as.character(year))
+
+all_psi_stan <- bind_rows(psi_full, psi_sens) %>% mutate(model = "Stan")
+
+names(psi_spocc) <- names(all_psi_stan)
+
+all_psi <- bind_rows(psi_spocc, all_psi_stan)
 
 all_psi %>% 
-  filter(!(spp %in% exclude)) %>% 
+  filter(!(spp %in% exclude),
+         model == "Stan") %>% 
   mutate(spp = toupper(spp)) %>% 
 ggplot(aes(x = years, y = mean_psi, group = analysis))+
   geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, size = 0.75,
                 position = position_dodge(width = 0.5)) +
   geom_errorbar(aes(ymin = q25, ymax = q75, color = analysis), width = 0,
+                size = 1.5, position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  theme_bw() +
+  ylim(c(0,1))+
+  facet_grid(spp ~ .) +
+  xlab('Species') + 
+  ylab(TeX("$\\hat{psi}$")) +
+  ggtitle('Comparing posterior occupancy estimates (Mean & 95% CI)',
+          'Single-season, multi-species model')+
+  labs(color = "Legend") 
+```
+
+```{r fig.height=20, fig.width=8}
+#| label: fig-psi-spocc
+#| fig-cap: "Region-wide summary of the posterior distribution of $\\hat{psi_t}$ along with 50% credible interval (colored region) and 95% credible interval (black line)."
+all_psi %>% 
+  filter(!(spp %in% exclude),
+         analysis == "OR|WA|ID") %>% 
+  mutate(spp = toupper(spp)) %>% 
+ggplot(aes(x = years, y = mean_psi, group = model))+
+  geom_errorbar(aes(ymin = q2.5, ymax = q97.5), width = 0, size = 0.75,
+                position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q25, ymax = q75, color = model), width = 0,
                 size = 1.5, position = position_dodge(width = 0.5)) +
   geom_point(position = position_dodge(width = 0.5)) +
   theme_bw() +

@@ -37,13 +37,15 @@ library(shinystan)
 nw_grid_all <- st_read(here("DataProcessed.nosync/occurrence/nw_grid_all_sens.shp"))
 
 ## Covariates model matrix (Occupancy)
-xmat_all <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/xmat_all_sens.rds"))
+xmat_all <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/xmat_all.rds"))
+xmat_cliff <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/xmat_cliff.rds"))
 
+cliff_bats <- c("anpa", "euma", "myci", "pahe")
 ## Original Model Object
 occ_data <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/occ_data_sens.rds"))
 
 ## Stan Model
-filenames <- list.files(path = here("DataProcessed.nosync/results/stan/ORWA_Only/fits/"), pattern = "*.rds", 
+filenames <- list.files(path = here("DataProcessed.nosync/results/stan/ORWA_Only/fits/"), pattern = "*stan.rds", 
                         full.names = T)
 
 occ_stan <- lapply(filenames,function(x) readRDS(here(x)))
@@ -56,7 +58,6 @@ occ_data <- occ_data[names(occ_stan)]
 all(names(occ_data) == names(occ_stan))  
 # Summarise Alphas ---------------------------------------------------------
 ## Extract all model parameters into a dataframe 
-### Alphas ###
 for (i in 1:length(occ_stan)) {
   ## Extract all model parameters into a dataframe 
   ## Intercepts
@@ -69,7 +70,13 @@ for (i in 1:length(occ_stan)) {
   alpha_auto_post <- rstan::extract(occ_stan[[i]], 'alpha_auto')$alpha_auto
   
   tmp_alphas <- cbind(alpha01_post, alpha02_post, alphas_post, alpha_auto_post) %>% as.data.frame()
-  names(tmp_alphas) <- c("int01", "int02", "forest_cover", "precip", "cliff_cover", "alpha_auto")
+  
+  if(names(occ_stan)[i] %in% c("anpa", "euma", "myci", "pahe")){
+    names(tmp_alphas) <- c("int01", "int02", "forest_cover", "precip", "elevation", "cliff_cover", "alpha_auto")
+  }
+  else{
+    names(tmp_alphas) <- c("int01", "int02", "forest_cover", "precip", "elevation", "alpha_auto")
+  }
   
   tmp_alphas <- tmp_alphas %>% mutate(spp = names(occ_stan)[i])
   if(i == 1){all_alphas <- tmp_alphas}
@@ -81,13 +88,13 @@ alpha_summ <- all_alphas %>%
   pivot_longer(cols = -spp, names_to = "alpha", values_to = "value") %>% 
   group_by(spp, alpha) %>% 
   summarise(mean = mean(value),
-            q2.5 = quantile(value, probs = c(0.025)),
-            q25 = quantile(value, probs = c(0.25)),
-            q50 = quantile(value, probs = c(0.5)),
-            q75 = quantile(value, probs = c(0.75)),
-            q97.5 = quantile(value, probs = c(0.975))) %>% 
+            q2.5 = quantile(value, probs = c(0.025), na.rm = T),
+            q25 = quantile(value, probs = c(0.25), na.rm = T),
+            q50 = quantile(value, probs = c(0.5), na.rm = T),
+            q75 = quantile(value, probs = c(0.75), na.rm = T),
+            q97.5 = quantile(value, probs = c(0.975), na.rm = T)) %>% 
   ungroup() %>% 
-  mutate(alpha = factor(alpha, levels = c("int01", "int02", "forest_cover", "precip", "cliff_cover", "alpha_auto")))
+  mutate(alpha = factor(alpha, levels = c("int01", "int02", "forest_cover", "precip", "elevation", "cliff_cover", "alpha_auto")))
 
 saveRDS(alpha_summ, here("DataProcessed.nosync/results/stan/ORWA_Only/alpha_summ.rds"))
 
@@ -125,7 +132,7 @@ saveRDS(beta_summ, here("DataProcessed.nosync/results/stan/ORWA_Only/beta_summ.r
 # Summarise Psi -----------------------------------------------------------
 # Create a function to create summaries of the posterior predictio --------
 
-get_occ_post <- function(occ_stan, n_years){
+get_occ_post <- function(occ_stan, xmat, n_years){
   # Extract Occurrence Model Params. (Posterior Distributions)-----
   ## Intercepts
   alpha01_post <- rstan::extract(occ_stan, 'alpha01')$alpha01
@@ -144,9 +151,9 @@ get_occ_post <- function(occ_stan, n_years){
   
   
   ##Add intercept column to x-matrix and multiply, then transform
-  psi_posta <- plogis(cbind(1, xmat_all) %*% t(alpha_posta))
-  psi_postb <- plogis(cbind(1, xmat_all) %*% t(alpha_postb))
-  psi_postc <- plogis(cbind(1, xmat_all) %*% t(alpha_postc))
+  psi_posta <- plogis(cbind(1, xmat) %*% t(alpha_posta))
+  psi_postb <- plogis(cbind(1, xmat) %*% t(alpha_postb))
+  psi_postc <- plogis(cbind(1, xmat) %*% t(alpha_postc))
   
   ## initialize list for psi for each year
   psi_post <- list()
@@ -176,8 +183,10 @@ get_occ_post <- function(occ_stan, n_years){
 # Extract parameters, get posterior predictions, and summarise ------------
 n_years <- occ_data[[1]]$n_years
 
-occ_post <- lapply(occ_stan, function(x) {get_occ_post(x, n_years = n_years)})
+occ_post <- lapply(occ_stan[!names(occ_stan) %in% cliff_bats], function(x) {get_occ_post(x, n_years = n_years, xmat = xmat_all)})
+occ_post_cliff <- lapply(occ_stan[cliff_bats], function(x) {get_occ_post(x, n_years = n_years, xmat = xmat_cliff)})
 
+occ_all <- c(occ_post, occ_post_cliff)
 # Create vector of years to name columns in resulting sf object -----------
 years <- paste0(2016:2022)
 
@@ -242,9 +251,9 @@ post_map <- function(grid, post_summ, years){
 }
 
 # Summarise in map form ---------------------------------------------------
-occ_map <- lapply(occ_post, function(x) post_map(grid = nw_grid_all, 
-                                                 post_summ = x, 
-                                                 years = years))
+occ_map <- lapply(occ_all, function(x) post_map(grid = nw_grid_all, 
+                                                post_summ = x, 
+                                                years = years))
 
 ## Save out the map file 
 saveRDS(occ_map, here("DataProcessed.nosync/results/stan/ORWA_Only/occ_map.rds"))
@@ -265,7 +274,7 @@ for (i in 1:length(occ_map)) {
     ggtitle(paste0(sp_name, ' Posterior Mean Occupancy'),
             'Multi-season, single-species model')
   
-  ggsave(plot = means_map ,filename = paste0(sp_name, "_post_means_map.png"), path = here("DataProcessed.nosync/maps/stan/ORWA_Only/means/"), width = 3840, height = 2160, units = "px", dpi = "retina")
+  ggsave(plot = means_map ,filename = paste0(sp_name, "_post_means_map.png"), path = here("DataProcessed.nosync/maps/stan/ORWA_only/means/"), width = 3840, height = 2160, units = "px", dpi = "retina")
   
   # ci map
   # mean map
@@ -281,6 +290,6 @@ for (i in 1:length(occ_map)) {
     ggtitle(paste0(sp_name, ' Posterior 95% Credible Interval (Width)'),
             'Multi-season, single-species model')
   
-  ggsave(plot = ci_map ,filename = paste0(sp_name, "_post_ci_map.png"), path = here("DataProcessed.nosync/maps/stan/ORWA_Only/width/"), width = 3840, height = 2160, units = "px", dpi = "retina")
+  ggsave(plot = ci_map ,filename = paste0(sp_name, "_post_ci_map.png"), path = here("DataProcessed.nosync/maps/stan/ORWA_only/width/"), width = 3840, height = 2160, units = "px", dpi = "retina")
 }
 

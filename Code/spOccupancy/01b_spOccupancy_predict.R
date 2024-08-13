@@ -37,6 +37,8 @@ library(spOccupancy)
 covars <- read_sf(here("DataProcessed.nosync/occurrence/batgrid_covars_scaled.shp"))
 bat.dat <- readRDS(here("DataProcessed.nosync/spOccupancy/bat_dat.rds"))
 
+covars <- covars %>% drop_na(precip)
+
 coords <- covars %>% st_centroid() %>% st_coordinates()
 # format covariates for prediction ----------------------------------------
 files <- list.files(path = here("DataProcessed.nosync/spOccupancy/fits/"))

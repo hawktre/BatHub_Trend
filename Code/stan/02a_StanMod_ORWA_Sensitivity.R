@@ -79,6 +79,7 @@ ggplot()+
   geom_sf(data = nw_nights_spat, aes(color = state))
 
 #calculated scaled versions of the nightly continuous covariates
+#calculated scaled versions of the nightly continuous covariates
 vmat_temp_a <- nw_nights_all %>%
   select(tmin, daylight) %>%
   scale()
@@ -105,10 +106,10 @@ n_visits_dfa <- nw_nights_all %>%
 
 #Need to fill in the zeros for this
 n_visits_dfb <- pivot_wider(n_visits_dfa,
-                             id_cols = cell,
-                             names_from = year,
-                             values_from = n_visits,
-                             values_fill = list(n_visits = 0))
+                            id_cols = cell,
+                            names_from = year,
+                            values_from = n_visits,
+                            values_fill = list(n_visits = 0))
 
 #reorder columns
 n_visits_dfb <- select(n_visits_dfb, cell, '2016', '2017', 
@@ -144,12 +145,19 @@ nw_grid_all <- rbind(nw_grida, nw_gridb)
 xmat_all <- nw_grid_all %>%
   st_drop_geometry() %>%
   mutate(log_fc = log(p_forest + 1)) %>% 
-  select(log_fc, precip, cliff_cover) %>%
+  select(log_fc, precip, DEM_max) %>%
   scale()
 
 xmata <- xmat_all[which(nw_grid_all$samp_all == 1), ]
 xmatb <- xmat_all[which(nw_grid_all$samp_all == 0), ]
 
+xmat_cliff <- nw_grid_all %>%
+  st_drop_geometry() %>%
+  mutate(log_fc = log(p_forest + 1)) %>% 
+  select(log_fc, precip, DEM_max, cliff_cover) %>%
+  scale()
+xmatc <- xmat_cliff[which(nw_grid_all$samp_all == 1), ]
+xmatd <- xmat_cliff[which(nw_grid_all$samp_all == 0), ]
 # Setup remaining Stan data. ----------------------------------------------
 
 #Setup some of the Stan data.
@@ -160,7 +168,10 @@ n_years <- length(unique(nw_nights_all$year))
 
 #Number of covariates for occupancy and detection
 n_xcovs <- ncol(xmata)
+n_xcovs_c <- ncol(xmatc)
 n_vcovs <- ncol(vmat)
+
+
 
 #site factor
 site_f <- factor(rep(c(1:n_site_years), times = n_visits_vec))
@@ -179,17 +190,31 @@ for (i in possible_bats) {
   naiveb[which(n_visits_vec == 0)] <- 0
   naive_occ <- naiveb
   
-  occ_data[[i]] <- list('n_sites_total' = n_sites_total,
-                   'n_site_years' = n_site_years,
-                   'n_years' = n_years,
-                   'n_obs' = n_obs,
-                   'dets' = dets,
-                   'n_visits' = n_visits_vec,
-                   'naive_ind' = naive_occ,
-                   'n_covs1' = n_xcovs,
-                   'xmat' = xmata,
-                   'n_covs2' = n_vcovs,
-                   'vmat' = vmat)
+  if (i %in% c("anpa", "euma", "myci", "pahe")) {
+    occ_data[[i]] <- list('n_sites_total' = n_sites_total,
+                          'n_site_years' = n_site_years,
+                          'n_years' = n_years,
+                          'n_obs' = n_obs,
+                          'dets' = dets,
+                          'n_visits' = n_visits_vec,
+                          'naive_ind' = naive_occ,
+                          'n_covs1' = n_xcovs_c,
+                          'xmat' = xmatc,
+                          'n_covs2' = n_vcovs,
+                          'vmat' = vmat)
+  }
+  else{occ_data[[i]] <- list('n_sites_total' = n_sites_total,
+                             'n_site_years' = n_site_years,
+                             'n_years' = n_years,
+                             'n_obs' = n_obs,
+                             'dets' = dets,
+                             'n_visits' = n_visits_vec,
+                             'naive_ind' = naive_occ,
+                             'n_covs1' = n_xcovs,
+                             'xmat' = xmata,
+                             'n_covs2' = n_vcovs,
+                             'vmat' = vmat)}
+  
 }
 
 # Fit the stan model ------------------------------------------------------
@@ -200,16 +225,19 @@ for (i in 1:length(occ_data)) {
   print(names(occ_data)[i])
   
   # Fit occupancy model in Stan
-  occ_stan <- sampling(object = docc_model1,
-                       data = occ_data[[i]])
-  path_name <- paste0("DataProcessed.nosync/results/stan/ORWA_Only/",names(occ_data)[i], "_sens.rds")
+  occ_stan <- rstan::sampling(object = docc_model1,
+                              data = occ_data[[i]])
+  path_name <- paste0("DataProcessed.nosync/results/stan/ORWA_only/fits/",names(occ_data)[i], "_stan.rds")
+  
+  print(summary(occ_stan, c('alphas', 'betas')))
   
   saveRDS(occ_stan, here(path_name))
 }
 # Write out needed files --------------------------------------------------
 
-saveRDS(xmat_all, here("DataProcessed.nosync/results/stan/ORWA_Only/xmat_all_sens.rds"))
-saveRDS(occ_data, here("DataProcessed.nosync/results/stan/ORWA_Only/occ_data_sens.rds"))
+saveRDS(xmat_all, here("DataProcessed.nosync/results/stan/ORWA_only/xmat_all.rds"))
+saveRDS(xmat_cliff, here("DataProcessed.nosync/results/stan/ORWA_only/xmat_cliff.rds"))
+saveRDS(occ_data, here("DataProcessed.nosync/results/stan/ORWA_only/occ_data.rds"))
 st_write(nw_grid_all, here("DataProcessed.nosync/occurrence/nw_grid_all_sens.shp"), append = F)
 
 print(Sys.time())

@@ -55,7 +55,7 @@ fit.spOcc <- function(dat, occ.formula, det.formula){
   
 
   # specify mcmc settings ---------------------------------------------------
-  n.chains <- 3
+  n.chains <- 4
   n.batch <- 600
   batch.length <- 50
   n.samples <- n.batch * batch.length
@@ -92,7 +92,7 @@ for(s in 1:length(dimnames(bat.dat$y)[[1]])){
   }
   
   ## Detection Formula (always the same)
-  det.formula <- ~ clutter1 + clutter2 + clutter3 + clutter4 + tmin + dayl + water
+  det.formula <- ~ clutter + tmin + dayl + water
   
   #Fit the model and return the result
   fit <- fit.spOcc(dat = spp.dat, occ.formula = occ.formula, det.formula = det.formula)

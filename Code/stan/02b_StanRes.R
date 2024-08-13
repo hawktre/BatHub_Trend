@@ -38,7 +38,10 @@ nw_grid_all <- st_read(here("DataProcessed.nosync/occurrence/nw_grid_all.shp"))
 
 ## Covariates model matrix (Occupancy)
 xmat_all <- readRDS(here("DataProcessed.nosync/results/stan/full/xmat_all.rds"))
+xmat_cliff <- readRDS(here("DataProcessed.nosync/results/stan/full/xmat_cliff.rds"))
 
+## cliff bats
+cliff_bats <- c("anpa", "euma", "myci", "pahe")
 ## Original Model Object
 occ_data <- readRDS(here("DataProcessed.nosync/results/stan/full/occ_data.rds"))
 
@@ -55,7 +58,7 @@ occ_data <- occ_data[names(occ_stan)]
 
 all(names(occ_data) == names(occ_stan))  
 
-test <- rstan::extract(occ_stan$lano, 'logit_psi')$logit_psi
+dim(rstan::extract(occ_stan$anpa, 'logit_psi')$logit_psi)
 # Summarise Alphas ---------------------------------------------------------
 ## Extract all model parameters into a dataframe 
 ### Alphas ###
@@ -71,7 +74,13 @@ for (i in 1:length(occ_stan)) {
   alpha_auto_post <- rstan::extract(occ_stan[[i]], 'alpha_auto')$alpha_auto
   
   tmp_alphas <- cbind(alpha01_post, alpha02_post, alphas_post, alpha_auto_post) %>% as.data.frame()
-  names(tmp_alphas) <- c("int01", "int02", "forest_cover", "precip", "cliff_cover", "alpha_auto")
+  
+  if(names(occ_stan)[i] %in% c("anpa", "euma", "myci", "pahe")){
+  names(tmp_alphas) <- c("int01", "int02", "forest_cover", "precip", "elevation", "cliff_cover", "alpha_auto")
+  }
+  else{
+    names(tmp_alphas) <- c("int01", "int02", "forest_cover", "precip", "elevation", "alpha_auto")
+  }
   
   tmp_alphas <- tmp_alphas %>% mutate(spp = names(occ_stan)[i])
   if(i == 1){all_alphas <- tmp_alphas}
@@ -83,13 +92,13 @@ alpha_summ <- all_alphas %>%
   pivot_longer(cols = -spp, names_to = "alpha", values_to = "value") %>% 
   group_by(spp, alpha) %>% 
   summarise(mean = mean(value),
-            q2.5 = quantile(value, probs = c(0.025)),
-            q25 = quantile(value, probs = c(0.25)),
-            q50 = quantile(value, probs = c(0.5)),
-            q75 = quantile(value, probs = c(0.75)),
-            q97.5 = quantile(value, probs = c(0.975))) %>% 
+            q2.5 = quantile(value, probs = c(0.025), na.rm = T),
+            q25 = quantile(value, probs = c(0.25), na.rm = T),
+            q50 = quantile(value, probs = c(0.5), na.rm = T),
+            q75 = quantile(value, probs = c(0.75), na.rm = T),
+            q97.5 = quantile(value, probs = c(0.975), na.rm = T)) %>% 
   ungroup() %>% 
-  mutate(alpha = factor(alpha, levels = c("int01", "int02", "forest_cover", "precip", "cliff_cover", "alpha_auto")))
+  mutate(alpha = factor(alpha, levels = c("int01", "int02", "forest_cover", "precip", "elevation", "cliff_cover", "alpha_auto")))
 
 saveRDS(alpha_summ, here("DataProcessed.nosync/results/stan/full/alpha_summ.rds"))
 
@@ -127,7 +136,7 @@ saveRDS(beta_summ, here("DataProcessed.nosync/results/stan/full/beta_summ.rds"))
 # Summarise Psi -----------------------------------------------------------
 # Create a function to create summaries of the posterior predictio --------
 
-get_occ_post <- function(occ_stan, n_years){
+get_occ_post <- function(occ_stan, xmat, n_years){
   # Extract Occurrence Model Params. (Posterior Distributions)-----
   ## Intercepts
   alpha01_post <- rstan::extract(occ_stan, 'alpha01')$alpha01
@@ -146,9 +155,9 @@ get_occ_post <- function(occ_stan, n_years){
 
   
   ##Add intercept column to x-matrix and multiply, then transform
-  psi_posta <- plogis(cbind(1, xmat_all) %*% t(alpha_posta))
-  psi_postb <- plogis(cbind(1, xmat_all) %*% t(alpha_postb))
-  psi_postc <- plogis(cbind(1, xmat_all) %*% t(alpha_postc))
+  psi_posta <- plogis(cbind(1, xmat) %*% t(alpha_posta))
+  psi_postb <- plogis(cbind(1, xmat) %*% t(alpha_postb))
+  psi_postc <- plogis(cbind(1, xmat) %*% t(alpha_postc))
   
   ## initialize list for psi for each year
   psi_post <- list()
@@ -171,15 +180,19 @@ get_occ_post <- function(occ_stan, n_years){
                                                       q97.5 = apply(x, 1, quantile, probs = 0.975))})
   
   return(list("psi_summary" = psi_summ,
+              "psi_post" = psi_post, 
               "n_years" = n_years))
 }
 
+# Get predicted psi for each site.  ---------------------------------------
 
 # Extract parameters, get posterior predictions, and summarise ------------
 n_years <- occ_data[[1]]$n_years
 
-occ_post <- lapply(occ_stan, function(x) {get_occ_post(x, n_years = n_years)})
+occ_post <- lapply(occ_stan[!names(occ_stan) %in% cliff_bats], function(x) {get_occ_post(x, n_years = n_years, xmat = xmat_all)})
+occ_post_cliff <- lapply(occ_stan[cliff_bats], function(x) {get_occ_post(x, n_years = n_years, xmat = xmat_cliff)})
 
+occ_all <- c(occ_post, occ_post_cliff)
 # Create vector of years to name columns in resulting sf object -----------
 years <- paste0(2016:2022)
 
@@ -244,7 +257,7 @@ post_map <- function(grid, post_summ, years){
 }
 
 # Summarise in map form ---------------------------------------------------
-occ_map <- lapply(occ_post, function(x) post_map(grid = nw_grid_all, 
+occ_map <- lapply(occ_all, function(x) post_map(grid = nw_grid_all, 
                                                  post_summ = x, 
                                                  years = years))
   
@@ -285,5 +298,3 @@ for (i in 1:length(occ_map)) {
   
   ggsave(plot = ci_map ,filename = paste0(sp_name, "_post_ci_map.png"), path = here("DataProcessed.nosync/maps/stan/full/width/"), width = 3840, height = 2160, units = "px", dpi = "retina")
 }
-
-     

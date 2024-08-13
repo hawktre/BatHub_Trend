@@ -164,7 +164,10 @@ n_years <- length(unique(nw_nights_all$year))
 
 #Number of covariates for occupancy and detection
 n_xcovs <- ncol(xmata)
+n_xcovs_c <- ncol(xmatc)
 n_vcovs <- ncol(vmat)
+
+
 
 #site factor
 site_f <- factor(rep(c(1:n_site_years), times = n_visits_vec))
@@ -191,7 +194,7 @@ for (i in possible_bats) {
                           'dets' = dets,
                           'n_visits' = n_visits_vec,
                           'naive_ind' = naive_occ,
-                          'n_covs1' = n_xcovs,
+                          'n_covs1' = n_xcovs_c,
                           'xmat' = xmatc,
                           'n_covs2' = n_vcovs,
                           'vmat' = vmat)
@@ -210,8 +213,6 @@ for (i in possible_bats) {
   
 }
 
-occ_data$laci
-
 # Fit the stan model ------------------------------------------------------
 ## Load the model
 docc_model1 <- stan_model(here('Code/docc_model1.stan'))
@@ -224,11 +225,14 @@ for (i in 1:length(occ_data)) {
                        data = occ_data[[i]])
   path_name <- paste0("DataProcessed.nosync/results/stan/full/fits/",names(occ_data)[i], "_stan.rds")
   
+  print(summary(occ_stan, c('alphas', 'betas')))
+  
   saveRDS(occ_stan, here(path_name))
 }
 # Write out needed files --------------------------------------------------
 
 saveRDS(xmat_all, here("DataProcessed.nosync/results/stan/full/xmat_all.rds"))
+saveRDS(xmat_cliff, here("DataProcessed.nosync/results/stan/full/xmat_cliff.rds"))
 saveRDS(occ_data, here("DataProcessed.nosync/results/stan/full/occ_data.rds"))
 st_write(nw_grid_all, here("DataProcessed.nosync/occurrence/nw_grid_all.shp"), append = F)
 

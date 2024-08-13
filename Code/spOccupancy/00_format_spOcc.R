@@ -78,7 +78,8 @@ covars_join <- st_drop_geometry(covars_join)
 
 dets <- dets %>%
   left_join(covars_join, by = "cell") %>% 
-  #mutate(clutter = factor(clutter, levels = c(-1, 0, 1, 2, 3), labels = c(0, 1, 2, 3, 4))) %>% 
+  #mutate(clutter = factor(clutter, levels = c(-1, 0, 1, 2, 3), labels = c(-1, 0, 1, 2, 3))) %>% 
+  mutate(clutter = as.integer(clutter) - 2) %>% 
   group_by(cell, year) %>%
   mutate(replicate_id = as.numeric(factor(replicate, levels = unique(replicate)))) %>%
   ungroup() %>% 
@@ -123,13 +124,14 @@ occ.covs$year <- matrix(rep(unique(dets$year), each = length(occ.covs$cell)),
 design.matrix.surveyed <- model.matrix(~ clutter + scale(tmin) + scale(daylight) + water_ind, data = dets)
 
 det.covs <- list()
-det.covs[['clutter1']] <- tapply(design.matrix.surveyed[,2], select(dets, cell, year, replicate_id), identity)
-det.covs[['clutter2']] <- tapply(design.matrix.surveyed[,3], select(dets, cell, year, replicate_id), identity)
-det.covs[['clutter3']] <- tapply(design.matrix.surveyed[,4], select(dets, cell, year, replicate_id), identity)
-det.covs[['clutter4']] <- tapply(design.matrix.surveyed[,5], select(dets, cell, year, replicate_id), identity)
-det.covs[['tmin']] <- tapply(design.matrix.surveyed[,6], select(dets, cell, year, replicate_id), identity)
-det.covs[['dayl']] <- tapply(design.matrix.surveyed[,7], select(dets, cell, year, replicate_id), identity)
-det.covs[['water']] <- tapply(design.matrix.surveyed[,8], select(dets, cell, year, replicate_id), identity)
+# det.covs[['clutter1']] <- tapply(design.matrix.surveyed[,2], select(dets, cell, year, replicate_id), identity)
+# det.covs[['clutter2']] <- tapply(design.matrix.surveyed[,3], select(dets, cell, year, replicate_id), identity)
+# det.covs[['clutter3']] <- tapply(design.matrix.surveyed[,4], select(dets, cell, year, replicate_id), identity)
+# det.covs[['clutter4']] <- tapply(design.matrix.surveyed[,5], select(dets, cell, year, replicate_id), identity)
+det.covs[['clutter']] <- tapply(design.matrix.surveyed[,2], select(dets, cell, year, replicate_id), identity)
+det.covs[['tmin']] <- tapply(design.matrix.surveyed[,3], select(dets, cell, year, replicate_id), identity)
+det.covs[['dayl']] <- tapply(design.matrix.surveyed[,4], select(dets, cell, year, replicate_id), identity)
+det.covs[['water']] <- tapply(design.matrix.surveyed[,5], select(dets, cell, year, replicate_id), identity)
 
 # Site coordinates (projected) ---------------------------------------------
 sites.sp <- covars %>% 
