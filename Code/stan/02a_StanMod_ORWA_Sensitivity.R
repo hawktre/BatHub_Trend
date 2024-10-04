@@ -34,10 +34,10 @@ library(rstan)
 # Read in the data --------------------------------------------------------
 
 ## Detections 
-nw_nights <- readRDS(here("DataProcessed.nosync/detections/nw_nights.rds"))
+nw_nights <- readRDS(here("DataProcessed/detections/nw_nights.rds"))
 
 ## Occurrence Covariates
-nw_grid_shp <- readRDS(here("DataProcessed.nosync/occurrence/nw_grid_shp.rds"))
+nw_grid_shp <- readRDS(here("DataProcessed/occurrence/nw_grid_shp.rds"))
 
 
 possible_bats <- c("laci",
@@ -79,20 +79,17 @@ ggplot()+
   geom_sf(data = nw_nights_spat, aes(color = state))
 
 #calculated scaled versions of the nightly continuous covariates
-#calculated scaled versions of the nightly continuous covariates
 vmat_temp_a <- nw_nights_all %>%
   select(tmin, daylight) %>%
   scale()
 
-#Reformat some of the categorical detection covariates and
-#add those into the matrix for detection covariates.
-#Also have a version with treating clutter as continuous in
-#the model (values -2, 1, 0, 1, 2).
+# Relevel clutter to have ref level (75-100%)
+nw_nights_all$clutter <- relevel(nw_nights_all$clutter, ref = "3")
+
+#Create categorical vaiables model matrix.
 det_cat <- nw_nights_all %>%
   select(clutter, water_ind)
-det_cat$clutter <- det_cat$clutter %>%
-  as.character() %>%
-  as.numeric()
+
 
 vmat_temp_b <- model.matrix(~clutter + water_ind, data = det_cat)
 
@@ -153,8 +150,9 @@ xmatb <- xmat_all[which(nw_grid_all$samp_all == 0), ]
 
 xmat_cliff <- nw_grid_all %>%
   st_drop_geometry() %>%
-  mutate(log_fc = log(p_forest + 1)) %>% 
-  select(log_fc, precip, DEM_max, cliff_cover) %>%
+  mutate(log_fc = log(p_forest + 1),
+         log_cliff = log(cliff_cover*100 + 1)) %>% 
+  select(log_fc, precip, DEM_max, log_cliff) %>%
   scale()
 xmatc <- xmat_cliff[which(nw_grid_all$samp_all == 1), ]
 xmatd <- xmat_cliff[which(nw_grid_all$samp_all == 0), ]
@@ -219,25 +217,25 @@ for (i in possible_bats) {
 
 # Fit the stan model ------------------------------------------------------
 ## Load the model
-docc_model1 <- stan_model(here('Code/docc_model1.stan'))
+docc_model1 <- stan_model(here('Code/stan/docc_model1.stan'))
 
 for (i in 1:length(occ_data)) {
   print(names(occ_data)[i])
   
   # Fit occupancy model in Stan
   occ_stan <- rstan::sampling(object = docc_model1,
-                              data = occ_data[[i]])
-  path_name <- paste0("DataProcessed.nosync/results/stan/ORWA_only/fits/",names(occ_data)[i], "_stan.rds")
-  
-  print(summary(occ_stan, c('alphas', 'betas')))
+                              data = occ_data[[i]],
+                              include = F,
+                              pars = c("logit_psi", "logit_p"))
+  path_name <- paste0("DataProcessed/results/stan/ORWA_only/fits/",names(occ_data)[i], "_stan.rds")
   
   saveRDS(occ_stan, here(path_name))
 }
 # Write out needed files --------------------------------------------------
 
-saveRDS(xmat_all, here("DataProcessed.nosync/results/stan/ORWA_only/xmat_all.rds"))
-saveRDS(xmat_cliff, here("DataProcessed.nosync/results/stan/ORWA_only/xmat_cliff.rds"))
-saveRDS(occ_data, here("DataProcessed.nosync/results/stan/ORWA_only/occ_data.rds"))
-st_write(nw_grid_all, here("DataProcessed.nosync/occurrence/nw_grid_all_sens.shp"), append = F)
+saveRDS(xmat_all, here("DataProcessed/results/stan/ORWA_only/xmat_all.rds"))
+saveRDS(xmat_cliff, here("DataProcessed/results/stan/ORWA_only/xmat_cliff.rds"))
+saveRDS(occ_data, here("DataProcessed/results/stan/ORWA_only/occ_data.rds"))
+st_write(nw_grid_all, here("DataProcessed/occurrence/nw_grid_all_sens.shp"), append = F)
 
 print(Sys.time())

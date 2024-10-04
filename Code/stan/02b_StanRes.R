@@ -34,19 +34,20 @@ library(shinystan)
 
 # Read in necessary data --------------------------------------------------
 ## Bat Grid Shapefile
-nw_grid_all <- st_read(here("DataProcessed.nosync/occurrence/nw_grid_all.shp"))
+nw_grid_all <- st_read(here("DataProcessed/occurrence/nw_grid_all.shp"))
 
 ## Covariates model matrix (Occupancy)
-xmat_all <- readRDS(here("DataProcessed.nosync/results/stan/full/xmat_all.rds"))
-xmat_cliff <- readRDS(here("DataProcessed.nosync/results/stan/full/xmat_cliff.rds"))
+xmat_all <- readRDS(here("DataProcessed/results/stan/full/xmat_all.rds"))
+xmat_cliff <- readRDS(here("DataProcessed/results/stan/full/xmat_cliff.rds"))
 
 ## cliff bats
 cliff_bats <- c("anpa", "euma", "myci", "pahe")
+
 ## Original Model Object
-occ_data <- readRDS(here("DataProcessed.nosync/results/stan/full/occ_data.rds"))
+occ_data <- readRDS(here("DataProcessed/results/stan/full/occ_data.rds"))
 
 ## Stan Model
-filenames <- list.files(path = here("DataProcessed.nosync/results/stan/full/fits/"), pattern = "*.rds", 
+filenames <- list.files(path = here("DataProcessed/results/stan/full/fits/"), pattern = "*.rds", 
                         full.names = T)
 
 occ_stan <- lapply(filenames,function(x) readRDS(here(x)))
@@ -58,7 +59,6 @@ occ_data <- occ_data[names(occ_stan)]
 
 all(names(occ_data) == names(occ_stan))  
 
-dim(rstan::extract(occ_stan$anpa, 'logit_psi')$logit_psi)
 # Summarise Alphas ---------------------------------------------------------
 ## Extract all model parameters into a dataframe 
 ### Alphas ###
@@ -81,15 +81,21 @@ for (i in 1:length(occ_stan)) {
   else{
     names(tmp_alphas) <- c("int01", "int02", "forest_cover", "precip", "elevation", "alpha_auto")
   }
+  #Get the number of chains
+  n_chains <- occ_stan[[i]]@sim$chains
+  chain_length <- (occ_stan[[i]]@sim$iter - occ_stan[[i]]@sim$warmup)/occ_stan[[i]]@sim$thin
   
-  tmp_alphas <- tmp_alphas %>% mutate(spp = names(occ_stan)[i])
+  tmp_alphas <- tmp_alphas %>% mutate(chain = paste0("Chain ", rep(seq(1:4), each = 1000)),
+                                      iter = rep(seq(1:1000), 4),
+                                      spp = names(occ_stan)[i])
+  
   if(i == 1){all_alphas <- tmp_alphas}
   else{all_alphas <- bind_rows(all_alphas, tmp_alphas)}
 }
 
-# Plot alphas
+# Alphas Summary
 alpha_summ <- all_alphas %>% 
-  pivot_longer(cols = -spp, names_to = "alpha", values_to = "value") %>% 
+  pivot_longer(cols = -c(spp, iter, chain), names_to = "alpha", values_to = "value") %>% 
   group_by(spp, alpha) %>% 
   summarise(mean = mean(value),
             q2.5 = quantile(value, probs = c(0.025), na.rm = T),
@@ -100,7 +106,26 @@ alpha_summ <- all_alphas %>%
   ungroup() %>% 
   mutate(alpha = factor(alpha, levels = c("int01", "int02", "forest_cover", "precip", "elevation", "cliff_cover", "alpha_auto")))
 
-saveRDS(alpha_summ, here("DataProcessed.nosync/results/stan/full/alpha_summ.rds"))
+saveRDS(alpha_summ, here("DataProcessed/results/stan/full/alpha_summ.rds"))
+
+## Alphas Traceplot
+for (i in 1:length(occ_stan)) {
+  
+  spp.tmp <- names(occ_stan)[i]
+
+  alpha_traceplot <- all_alphas %>%
+    filter(spp == spp.tmp) %>% 
+    pivot_longer(cols = -c(chain, iter, spp)) %>% 
+    ggplot(aes(y = value, x = iter))+
+    geom_line(aes(color = chain))+
+    facet_wrap(~name, scales = "free", nrow = 6)+
+    labs(title = paste0(toupper(spp.tmp), " MCMC Traceplot (Occurrence Model)"),
+         x = "Iteration",
+         y = "Value",
+         color = "Chain")
+  
+  ggsave(filename = paste0(spp.tmp, "_traceplot.png"), plot = alpha_traceplot, device = "png", path = here("DataProcessed/results/stan/full/plots/traceplots/occurrence/"), width = 3840, height = 2160, units = "px", dpi = "retina")
+}
 
 # Summarise Betas ---------------------------------------------------------
 for (i in 1:length(occ_stan)) {
@@ -111,7 +136,15 @@ for (i in 1:length(occ_stan)) {
   betas_post <- rstan::extract(occ_stan[[i]], 'betas')$betas
   
   tmp_betas <- cbind(beta0_post,betas_post) %>% as.data.frame()
-  names(tmp_betas) <- c("Intercept","tmin", "daylight", "clutter", "water")
+  names(tmp_betas) <- c("Intercept","tmin", "daylight", "clutter0","clutter1", "clutter2", "clutter3", "water")
+  
+  #Get the number of chains
+  n_chains <- occ_stan[[i]]@sim$chains
+  chain_length <- (occ_stan[[i]]@sim$iter - occ_stan[[i]]@sim$warmup)/occ_stan[[i]]@sim$thin
+  
+  tmp_betas <- tmp_betas %>% mutate(chain = paste0("Chain ", rep(seq(1:4), each = 1000)),
+                                      iter = rep(seq(1:1000), 4),
+                                      spp = names(occ_stan)[i])
   
   tmp_betas <- tmp_betas %>% mutate(spp = names(occ_stan)[i])
   if(i == 1){all_betas <- tmp_betas}
@@ -120,7 +153,7 @@ for (i in 1:length(occ_stan)) {
 
 # Plot betas
 beta_summ <- all_betas %>% 
-  pivot_longer(cols = -spp, names_to = "betas", values_to = "value") %>% 
+  pivot_longer(cols = -c(spp, chain, iter), names_to = "betas", values_to = "value") %>% 
   group_by(spp, betas) %>% 
   summarise(mean = mean(value),
             q2.5 = quantile(value, probs = c(0.025)),
@@ -128,10 +161,30 @@ beta_summ <- all_betas %>%
             q50 = quantile(value, probs = c(0.5)),
             q75 = quantile(value, probs = c(0.75)),
             q97.5 = quantile(value, probs = c(0.975))) %>% 
-  ungroup() %>% 
-  mutate(betas = factor(betas, levels = c("Intercept","tmin", "daylight", "clutter", "water")))
+  ungroup() 
 
-saveRDS(beta_summ, here("DataProcessed.nosync/results/stan/full/beta_summ.rds"))
+saveRDS(beta_summ, here("DataProcessed/results/stan/full/beta_summ.rds"))
+
+## Betas Traceplot
+for (i in 1:length(occ_stan)) {
+  
+  spp.tmp <- names(occ_stan)[i]
+  
+  betas_traceplot <- all_betas %>%
+    filter(spp == spp.tmp) %>% 
+    pivot_longer(cols = -c(chain, iter, spp)) %>% 
+    ggplot(aes(y = value, x = iter))+
+    geom_line(aes(color = chain))+
+    facet_wrap(~name, scales = "free", nrow = 6)+
+    labs(title = paste0(toupper(spp.tmp), " MCMC Traceplot (Detection Model)"),
+         x = "Iteration",
+         y = "Value",
+         color = "Chain")
+  
+  ggsave(filename = paste0(spp.tmp, "_traceplot.png"), plot = betas_traceplot, device = "png", 
+         path = here("DataProcessed/results/stan/full/plots/traceplots/detection/"), 
+         width = 3840, height = 2160, units = "px", dpi = "retina")
+}
 
 # Summarise Psi -----------------------------------------------------------
 # Create a function to create summaries of the posterior predictio --------
@@ -148,10 +201,10 @@ get_occ_post <- function(occ_stan, xmat, n_years){
   alpha_auto_post <- rstan::extract(occ_stan, 'alpha_auto')$alpha_auto
   
   # Combine posteriors and calculate posterior predictions ------------------
-  alpha_posta <- cbind(alpha01_post, alphas_post)
-  alpha_postb <- cbind(alpha02_post, alphas_post)
+  alpha_posta <- cbind(alpha01_post, alphas_post) # Year 1
+  alpha_postb <- cbind(alpha02_post, alphas_post) # Colonization
   alpha_postc <- cbind(alpha02_post + alpha_auto_post,
-                       alphas_post)
+                       alphas_post) # survival
 
   
   ##Add intercept column to x-matrix and multiply, then transform
@@ -179,9 +232,7 @@ get_occ_post <- function(occ_stan, xmat, n_years){
                                                       q75 = apply(x, 1, quantile, probs = 0.75),
                                                       q97.5 = apply(x, 1, quantile, probs = 0.975))})
   
-  return(list("psi_summary" = psi_summ,
-              "psi_post" = psi_post, 
-              "n_years" = n_years))
+  return(list("psi_summary" = psi_summ))
 }
 
 # Get predicted psi for each site.  ---------------------------------------
@@ -190,7 +241,7 @@ get_occ_post <- function(occ_stan, xmat, n_years){
 n_years <- occ_data[[1]]$n_years
 
 occ_post <- lapply(occ_stan[!names(occ_stan) %in% cliff_bats], function(x) {get_occ_post(x, n_years = n_years, xmat = xmat_all)})
-occ_post_cliff <- lapply(occ_stan[cliff_bats], function(x) {get_occ_post(x, n_years = n_years, xmat = xmat_cliff)})
+occ_post_cliff <- lapply(occ_stan[names(occ_stan) %in% cliff_bats], function(x) {get_occ_post(x, n_years = n_years, xmat = xmat_cliff)})
 
 occ_all <- c(occ_post, occ_post_cliff)
 # Create vector of years to name columns in resulting sf object -----------
@@ -262,7 +313,7 @@ occ_map <- lapply(occ_all, function(x) post_map(grid = nw_grid_all,
                                                  years = years))
   
 ## Save out the map file 
-saveRDS(occ_map, here("DataProcessed.nosync/results/stan/full/occ_map.rds"))
+saveRDS(occ_map, here("DataProcessed/results/stan/full/occ_map.rds"))
 
 for (i in 1:length(occ_map)) {
   sp_name <- toupper(names(occ_map)[i])
@@ -280,7 +331,7 @@ for (i in 1:length(occ_map)) {
     ggtitle(paste0(sp_name, ' Posterior Mean Occupancy'),
             'Multi-season, single-species model')
   
-  ggsave(plot = means_map ,filename = paste0(sp_name, "_post_means_map.png"), path = here("DataProcessed.nosync/maps/stan/full/means/"), width = 3840, height = 2160, units = "px", dpi = "retina")
+  ggsave(plot = means_map ,filename = paste0(sp_name, "_post_means_map.png"), path = here("DataProcessed/maps/stan/full/means/"), width = 3840, height = 2160, units = "px", dpi = "retina")
   
   # ci map
   # mean map
@@ -296,5 +347,6 @@ for (i in 1:length(occ_map)) {
     ggtitle(paste0(sp_name, ' Posterior 95% Credible Interval (Width)'),
             'Multi-season, single-species model')
   
-  ggsave(plot = ci_map ,filename = paste0(sp_name, "_post_ci_map.png"), path = here("DataProcessed.nosync/maps/stan/full/width/"), width = 3840, height = 2160, units = "px", dpi = "retina")
+  ggsave(plot = ci_map ,filename = paste0(sp_name, "_post_ci_map.png"), path = here("DataProcessed/maps/stan/full/width/"), width = 3840, height = 2160, units = "px", dpi = "retina")
 }
+

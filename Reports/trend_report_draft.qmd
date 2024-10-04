@@ -37,18 +37,26 @@ setwd("/Users/trentvanhawkins/Library/Mobile Documents/com~apple~CloudDocs/Docum
 
 # Read in Data
 ## Full 
-occ_map <- readRDS(here("DataProcessed.nosync/results/stan/full/occ_map.rds"))
+dir <- "DataProcessed/results/jags/full/fits/"
 
-alpha_summ <- readRDS(here("DataProcessed.nosync/results/stan/full/alpha_summ.rds"))
+filenames <- list.files(here(dir))
 
-beta_summ <- readRDS(here("DataProcessed.nosync/results/stan/full/beta_summ.rds"))
+#read in the files into a list object
+occ_jags <- lapply(filenames,function (x) readRDS(paste0(dir, x)))
+
+# rename the list elements to have the correct names
+names(occ_jags) <- str_split_i(filenames, "_", 1)
 
 ## Sensitivity
-occ_map_sens <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/occ_map.rds"))
+dir <- "DataProcessed/results/jags/full/fits/"
 
-alpha_summ_sens <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/alpha_summ.rds"))
+filenames <- list.files(here(dir))
 
-beta_summ_sens <- readRDS(here("DataProcessed.nosync/results/stan/ORWA_Only/beta_summ.rds"))
+#read in the files into a list object
+occ_jags <- lapply(filenames,function (x) readRDS(paste0(dir, x)))
+
+# rename the list elements to have the correct names
+names(occ_jags) <- str_split_i(filenames, "_", 1)
 
 ## spOccupancy
 spOcc_summ <- readRDS(here("DataProcessed.nosync/spOccupancy/covars_summary.rds"))

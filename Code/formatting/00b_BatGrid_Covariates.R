@@ -28,7 +28,7 @@ require(terra)
 nabat_covars <- st_read(dsn = here("DataRaw.nosync/covariates/NABat_grid_covariates/"),
                     layer = "NABat_grid_covariates")
 ## conus_grts key
-conus10k <- read_sf(here("DataRaw.nosync/batgrid/complete_conus_mastersample_10km_attributed.shp"))
+conus10k <- read_sf(here("DataRaw/batgrid/complete_conus_mastersample_10km_attributed.shp"))
 
 ##Landfire gap cover 
 landfire_or <- terra::rast(here("DataRaw.nosync/covariates/LandFire/LF2022_OR/LC22_EVT_230.tif"))
