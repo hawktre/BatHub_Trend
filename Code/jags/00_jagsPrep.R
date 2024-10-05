@@ -203,6 +203,7 @@ for (i in possible_bats) {
   
 }
 
+saveRDS(occ_data, here("DataProcessed/results/jags/occ_data.rds"))
 
 #Specify initial values for z
 max2 <- function(x){
