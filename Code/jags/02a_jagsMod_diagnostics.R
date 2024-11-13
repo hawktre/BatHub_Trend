@@ -143,14 +143,14 @@ get_occ_post <- function(jags, xmat, n_years, grid){
     }
     
     alphas <- as.matrix(alphas)
-    gamma <- jags %>% 
+    col <- jags %>% 
       filter(spp == unique(jags$spp)[i], analysis == "OR|WA|ID") %>% 
-      select(dplyr::contains("gamma")) %>% 
+      select(dplyr::contains("col")) %>% 
       as.matrix()
     
-    phi <- jags %>% 
+    surv <- jags %>% 
       filter(spp == unique(jags$spp)[i], analysis == "OR|WA|ID") %>% 
-      select(dplyr::contains("phi")) %>% 
+      select(dplyr::contains("surv")) %>% 
       as.matrix()
     
     ## initialize list for psi for each year
@@ -164,8 +164,8 @@ get_occ_post <- function(jags, xmat, n_years, grid){
       else{
         
         #Combine colonization and alpha parameters to get posterior
-        alpha_post_col <- cbind(gamma[,j-1], alphas[,-1])
-        alpha_post_surv <- cbind(phi[,j-1], alphas[,-1])
+        alpha_post_col <- cbind(col[,j-1], alphas[,-1])
+        alpha_post_surv <- cbind(surv[,j-1], alphas[,-1])
         
         #Get the posteriors
         psi_post_col <- plogis(cbind(1, xmat) %*% t(alpha_post_col))
@@ -255,4 +255,3 @@ for (i in 1:length(occ_jags)) {
   
   ggsave(filename = paste0(spp.tmp, "_traceplot.png"), plot = beta_traceplot, device = "png", path = here("DataProcessed/results/jags/full/plots/traceplots/detections/"), width = 3840, height = 2160, units = "px", dpi = "retina")
 }
-

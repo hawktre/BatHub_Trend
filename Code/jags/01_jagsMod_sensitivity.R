@@ -2,7 +2,7 @@
 ##
 ## Script name: 01_jagsMod_sensitivity.R
 ##
-## Purpose of script:
+## Purpose of script: Fit the sensitivity analysis for PNW trend analysis. 
 ##
 ## Author: Trent VanHawkins
 ##
@@ -11,7 +11,7 @@
 ##
 ## ---------------------------
 ##
-## Notes:
+## Notes: Thi is the same as 00_jagsPrep.R, but fits using only Oregon and Washington Data
 ##   
 ##
 ## ---------------------------

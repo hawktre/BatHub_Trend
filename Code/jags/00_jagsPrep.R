@@ -120,6 +120,7 @@ xmat_all <- nw_grid_all %>%
 xmata <- xmat_all[which(nw_grid_all$samp_all == 1), ]
 xmatb <- xmat_all[which(nw_grid_all$samp_all == 0), ]
 
+#Repeat for cliff species design matrix
 xmat_cliff <- nw_grid_all %>%
   st_drop_geometry() %>%
   mutate(log_fc = log(p_forest + 1),
@@ -214,6 +215,7 @@ max2 <- function(x){
   }
 }
 
+#Fit the model for each species and output the results
 for (i in seq(1:length(occ_data))) {
   #Subset data for the current species
   tmp <- occ_data[[i]]
