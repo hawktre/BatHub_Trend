@@ -3,7 +3,6 @@
 **Analyst**: Trent VanHawkins  
 **GitHub Location**:  https://github.com/hawktre/BatHub_Trend
 
-# Introduction
 This repository documents code and results for a Trend analysis of bats in the Pacific Northwest. 
 
 Details about the folders:
