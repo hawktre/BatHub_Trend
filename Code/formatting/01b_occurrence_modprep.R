@@ -28,11 +28,11 @@ library(here)
 library(sf)
 
 # Read in the data --------------------------------------------------------
-nw_grid_shp <- read_sf(here("DataProcessed.nosync/occurrence/batgrid_covars.shp"))
+nw_grid_shp <- read_sf(here("DataProcessed/occurrence/batgrid_covars.shp"))
 
-nw_nights <- readRDS(here("DataProcessed.nosync/detections/nw_nights.rds"))
+nw_nights <- readRDS(here("DataProcessed/detections/nw_nights.rds"))
 
-wilson_shp <- readRDS(here("Background/nabat-code-tutorial.nosync/DataFiles/nw_grid_shp.rds"))
+
 ## rename nw_grid_shape to have the name cell
 nw_grid_shp <- nw_grid_shp %>% 
   rename("cell" = CONUS_10KM,
@@ -58,4 +58,4 @@ nw_grid_shp[is.na(nw_grid_shp)] <- 0
 nw_grid_shp <- nw_grid_shp %>% 
   arrange(desc(samp_all), cell)
   
-saveRDS(nw_grid_shp, here("DataProcessed.nosync/occurrence/nw_grid_shp.rds"))
+saveRDS(nw_grid_shp, here("DataProcessed/occurrence/nw_grid_shp.rds"))

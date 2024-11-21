@@ -25,15 +25,15 @@ require(terra)
 
 # Read in data ------------------------------------------------------------
 ## nabat covariates already aggregated for Udell et al., 2022
-nabat_covars <- st_read(dsn = here("DataRaw.nosync/covariates/NABat_grid_covariates/"),
+nabat_covars <- st_read(dsn = here("DataRaw/covariates/NABat_grid_covariates/"),
                     layer = "NABat_grid_covariates")
 ## conus_grts key
 conus10k <- read_sf(here("DataRaw/batgrid/complete_conus_mastersample_10km_attributed.shp"))
 
 ##Landfire gap cover 
-landfire_or <- terra::rast(here("DataRaw.nosync/covariates/LandFire/LF2022_OR/LC22_EVT_230.tif"))
-landfire_wa <- rast(here("DataRaw.nosync/covariates/LandFire/LF2022_WA/LC22_EVT_230.tif"))
-landfire_id <- rast(here("DataRaw.nosync/covariates/LandFire/LF2022_ID/LC22_EVT_230.tif"))
+landfire_or <- terra::rast(here("DataRaw/covariates/LandFire/LF2022_OR/LC22_EVT_230.tif"))
+landfire_wa <- rast(here("DataRaw/covariates/LandFire/LF2022_WA/LC22_EVT_230.tif"))
+landfire_id <- rast(here("DataRaw/covariates/LandFire/LF2022_ID/LC22_EVT_230.tif"))
 
 # subset and plot data ---------------------------------------------------------------
 ## Define pnw
@@ -101,7 +101,7 @@ covars <- covars %>%
 
 
 # Write out the results ---------------------------------------------------
-write_sf(covars, here("DataProcessed.nosync/occurrence/batgrid_covars.shp"))
+write_sf(covars, here("DataProcessed/occurrence/batgrid_covars.shp"))
 
 raw.occ.prob <- apply(bat.dat$y['epfu',,,], 2, mean, na.rm = TRUE)
 plot(2016:2022, raw.occ.prob, pch = 16, 

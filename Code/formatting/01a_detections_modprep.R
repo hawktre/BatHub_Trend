@@ -33,7 +33,7 @@ require(sf)
 
 # Read in the data --------------------------------------------------------
 
-detections <- read_csv(here("DataProcessed.nosync/detections/detections_formatted_2016-2022.csv"), na = c("<null>", "NA"))
+detections <- read_csv(here("DataProcessed/detections/detections_formatted_2016-2022.csv"), na = c("<null>", "NA"))
 
 # Reformat --------------------------------------------------------------------
 ## Make name of "cell" same in all datasets
@@ -140,4 +140,4 @@ detections_fn <- detections_fn %>%
   arrange(year, cell) 
 
 
-saveRDS(detections_fn, here("DataProcessed.nosync/detections/nw_nights.rds"))
+saveRDS(detections_fn, here("DataProcessed/detections/nw_nights.rds"))

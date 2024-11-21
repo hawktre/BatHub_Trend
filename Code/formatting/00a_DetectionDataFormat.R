@@ -28,11 +28,11 @@ require(future.apply)
 require(parallel)
 
 # Read in Required Data ---------------------------------------------------
-tblDeployment <- read_csv("DataRaw.nosync/database/tblDeployment.csv")
-tblPointLocation <- read_csv("DataRaw.nosync/database/tblPointLocation.csv")
-tblSite <- read_csv("DataRaw.nosync/database/tblSite.csv")
-tluClutter <- read_csv("DataRaw.nosync/database/tluClutter.csv")
-tluWaterBodyType <- read_csv("DataRaw.nosync/database/tluWaterBodyType.csv")
+tblDeployment <- read_csv("DataRaw/database/tblDeployment.csv")
+tblPointLocation <- read_csv("DataRaw/database/tblPointLocation.csv")
+tblSite <- read_csv("DataRaw/database/tblSite.csv")
+tluClutter <- read_csv("DataRaw/database/tluClutter.csv")
+tluWaterBodyType <- read_csv("DataRaw/database/tluWaterBodyType.csv")
 
 # Join all tables together ------------------------------------------------
 
@@ -65,7 +65,7 @@ deployment$year <- year(deployment$DeploymentDate)
 
 # Read in detection data --------------------------------------------------
 ## Read in
-acoustics <- data.table::fread(here("DataRaw.nosync/database/tblDeploymentDetection7.csv"))
+acoustics <- data.table::fread(here("DataRaw/database/tblDeploymentDetection7.csv"))
 
 ## Join with deployments and clean
 acoustics <- left_join(acoustics, deployment, by = c("DeploymentID" = "ID")) %>% 
@@ -163,11 +163,11 @@ daymet_get <- acoustics_wide %>%
 
 #download data for all sites (commented out because it takes a long time. ONLY RUN THE FIRST TIME)
 # daymet_all <- lapply(1:nrow(daymet_get), function(x){get_daymet(i = x, dat = daymet_get)}) 
-# write_rds(daymet_all, here("DataRaw.nosync/daymet/daymet_full.rds"))
+# write_rds(daymet_all, here("DataRaw/daymet/daymet_full.rds"))
 
 
 #Read in the daymet data (completed above) ------------------------------
-daymet_all <- readRDS(here("DataRaw.nosync/daymet/daymet_full.rds"))
+daymet_all <- readRDS(here("DataRaw/covariates/daymet/daymet_full.rds"))
 
 #Clean up
 daymet_all <- daymet_all %>%
@@ -182,4 +182,4 @@ acoustics_wide <- acoustics_wide %>%
   
 
 #Write out
-write_csv(acoustics_wide, here("DataProcessed.nosync/detections_formatted_2016-2022.csv"))
+write_csv(acoustics_wide, here("DataProcessed/detections/detections_formatted_2016-2022.csv"))
