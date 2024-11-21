@@ -34,8 +34,6 @@ tblSite <- read_csv("DataRaw.nosync/database/tblSite.csv")
 tluClutter <- read_csv("DataRaw.nosync/database/tluClutter.csv")
 tluWaterBodyType <- read_csv("DataRaw.nosync/database/tluWaterBodyType.csv")
 
-acoustics_example <- read_csv("Background/vignette-bayesian-site-occupancy-model-bat-acoustic-data.nosync/data/survey_data.csv")
-
 # Join all tables together ------------------------------------------------
 
 all_join <- left_join(tblDeployment, tblPointLocation, by = join_by(PointLocationID == ID)) %>% 
