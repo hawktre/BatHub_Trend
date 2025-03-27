@@ -30,6 +30,7 @@ library(tidyverse)
 library(here)
 library(sf)
 library(rjags)
+library(jagsUI)
 
 covars <- read_sf(here("DataProcessed/occurrence/batgrid_covars.shp"))
 dets <- readRDS(here("DataProcessed/detections/nw_nights.rds"))
@@ -216,33 +217,34 @@ max2 <- function(x){
 }
 
 #Fit the model for each species and output the results
-for (i in seq(1:length(occ_data))) {
-  #Subset data for the current species
+# Loop over species (only 1 here)
+for (i in seq(1:length(occ_jags))) {
+  # Subset data
   tmp <- occ_data[[i]]
   
-  #Print which species we are working with
+  # Print species name
   print(names(occ_data)[i])
+  print(Sys.time())
   
-  #Set inits
-  inits <- list('z' = apply(tmp$dets, c(1, 3), max2))
+  # Set initial values for z
+  inits <- function() {
+    list(z = apply(tmp$dets, c(1, 3), max2))
+  }
   
-  #Fit model to the  data
-  occ_adapt <- jags.model(file = here("Code/jags/occ_model_royle.jags"),
-                              data = tmp,
-                              n.chains = 4,
-                              n.adapt = 1000,
-                              inits = inits)
+  # Run model with jagsUI
+  occ_jags <- jags(data = tmp,
+                   inits = inits,
+                   parameters.to.save = c('alpha01', 'alphas',
+                                          'beta0', 'beta1', 'beta2',
+                                          'beta3', 'beta4', 'beta5', 
+                                          'beta6', 'beta7', 'psi'),
+                   model.file = here("Code/jags/occ_model_royle_onlypsi.jags"),
+                   n.chains = 4,
+                   n.iter = 10000,
+                   n.burnin = 2000,
+                   n.thin = 1,
+                   parallel = TRUE)  # optional for speed
   
-  occ_jags <- coda.samples(model = occ_adapt,
-                               variable.names = c('alpha01', 'alphas',
-                                                  'beta0', 'beta1', 'beta2',
-                                                  'beta3', 'beta4', 'beta5', 
-                                                  'beta6', 'beta7', 'lam.tot', 'lam.avg', 'lam.tot.avg',
-                                                  'lam.avg.avg', 'psi.hat', 'avg.psi', 'gamma', 'phi', 'surv', 'col', 'turnover'),
-                               n.iter = 5000, thin = 3)
-  
-  MCMCvis::MCMCsummary(occ_jags)
-  
+  # Save model output
   saveRDS(occ_jags, here(paste0("DataProcessed/results/jags/full/fits/", names(occ_data)[i], "_jagsfit.rds")))
-  
 }

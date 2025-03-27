@@ -65,10 +65,6 @@ covars_join <- covars %>%
   mutate(p_forest = log(p_forest + 1),
          precip = log(precip + 1),
          cliff_canyon = log(cliff_canyon+1),
-         anpa_range = as.factor(if_else(lengths(st_intersects(., anpa_range)) > 0, 1, 0)),
-         euma_range = as.factor(if_else(lengths(st_intersects(., euma_range)) > 0, 1, 0)),
-         myci_range = as.factor(if_else(lengths(st_intersects(., myci_range)) > 0, 1, 0)),
-         pahe_range = euma_range,
          across(karst:cliff_canyon, ~scale(.x)[,1])) 
 
 ## Write out the scaled covariates
@@ -95,7 +91,6 @@ ggplot()+
   geom_sf(data = dets.plt, aes(color = spp))+
   facet_wrap(~spp)
 
-pairs(dets %>% select(DEM_max, p_forest, mean_temp, precip, cliff_canyon))
 # Pivot long --------------------------------------------------------------
 
 dets_long <- dets %>%
