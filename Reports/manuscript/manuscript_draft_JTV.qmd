@@ -1,0 +1,49 @@
+---
+title: "Evidence of Declining Trend for Bats of the Pacific Northwest"
+subtitle: "An assessment of occupancy and trend from 2016-2022"
+author: 
+  - Trent VanHawkins
+  - Tom Rodhouse
+  - Beth Ward
+abstract: "this is an abstract"
+format: 
+  docx:
+    toc: true
+page-layout: full
+csl: apa.csl
+bibliography: references.bib
+---
+
+# Introduction
+
+# Methods
+
+Acoustic surveys were conducted in accordance with NABat study design and summer monitoring protocols between 2016 and 2022 [@loeb2015]. Briefly, the NABat survey design overlays a finite grid of $10 \times 10 \ \text{km}$ $\left(100 \ \text{km}^2 \right)$ cells spanning the continental U.S, hereto referred to as "grid-cells" or "cells". A Generalized Random-Tessellation Stratified (GRTS) Survey Design was employed to ensure that ordered subsets of this grid provide a random, spatially unbiased sample [@lobeb2015; @dumelle2023]. Here, the survey area of interest was the region denoted by the contiguous three-state boundary of Oregon, Washington, and Idaho.
+
+The NABat protocol calls for a spatial replicate of single-night acoustic surveys in each of the four $5 \times 5 \ \text{km}$ cell quadrants, denoted by the four inter-cardinal directions (NE, NW, SE, SW), between mid-May and late August. In the rare case that placing this was not possible due to physiographic or access limitations, surveys were permitted to be conducted within the same quadrant with the constraint that they were placed $\> 1 \ \text{km}$ apart. In the case that more than one night of acoustic recordings were made available, only the first night was used for this analysis.
+
+Once acoustic call files were captured, Sonobat (v4.?) was utilized to parse files containing potential echolocation calls from those containing ambient noise. Sonograms of the parsed files were then visually inspected by a domain expert to determine which species they contained. Species detection at the cell level was defined as the positive classification of $\geq 1$ call at $\geq 1$ spatial replicate within a survey season.
+
+## Statistical Analysis
+
+Dynamic occupancy models are a popular and powerful framework for modeling population dynamics of species who may not be individually identified, such as bats [@kery2021]. These models are particularly well suited for ecological studies that rely on imperfect detection methods [@irvine2018], such as acoustic monitoring. We implemented a bayesian version of this framework, following an approach similar to @rodhouse2019.
+
+We define the true underlying occupancy state of cell $i$ at year $t$ as $Z_{it} \in \{0,1\}$, where 1 indicates presence and 0 absence. When conducting surveillance via passive acoustic monitoring, $Z_{it}$ is treated as unobserved, as detection via acoustic monitoring implies species presence, but non-detection does not imply absence. Instead, we model occupancy state as a Bernoulli random variable with probability $\psi_{it}$. That is
+
+$$Z_{it} \sim \text{Bernoulli}(\psi_{it}),$$ {#eq-occ_var}
+
+The occupancy probability $(\psi_{it})$ can be further be modeled as a function of environmental covariates with effect parameter $\boldsymbol\alpha$. We will also allow for temporal dynamics by explicitly modeling the probabilities of transitioning occupancy states in years $t \in \{2, ..., T\}$. The probability of colonization is denoted by $\gamma_{t}$ and describes the probability that a an unoccupied cell in year $t-1$ transitions to being occupied in year $t$. Conversely, The probability of survival is denoted by $\phi_{t}$ and describes the probability that a cell occupied in year $t-1$ remains occupied in year $t$. This model parameterization is often referred to as "fully dynamic" [@kery2021]:
+
+$$\text{logit}(\psi_{i1}) = \alpha_{01} + {\bf x}_i\alpha,$${#eq-modyear1}
+
+$$\text{logit}(\psi_{it}) = \gamma_{t} + {\bf x}_i\alpha + Z_{i(t-1)}\phi_{t}\text{ for }t \in \{2,\ldots,T\}$${#eq-modyeart}
+
+Finally, we have a detection sub-model which estimates the conditional probability that we detected a bat species ($p_{ijt}$) at site $i$ and replicate $j$ on year $t$ given that site $i$ was occupied at year $t$. We assume that $p_{ijt}$ arises from a similar probability distribution and may also be explained by some environmental covariates $\bf{v}$, for which we wish to estimate effects ($\bf{\beta}$).\
+
+$$[Y_{ijt} \mid Z_{it}] \sim \text{Bernoulli}(m_{it}, p_{ijt})$$ $$\text{logit}(p_{ijt}) = \beta_0 + {\bf v}_{ijt}\beta,$$
+
+A full summary of these parameters is provided in @tbl-params and environmental covariates in @tbl-covars. For the purpose of this report, we are most interested in reviewing the posterior probability of occupancy ($\psi_{it}$), effect estimates for occupancy environmental covariates ($\bf{\alpha}$), and effect estimates for detection environmental covariates $\bf{\beta}$. MCMC sampling was conducted in 4 chains, each run for 5000 iterations with a thinning rate of 3 and burn-in of 1000 iterations. Vague priors (Normal (mean = 0, var = 10)) priors were used universally. All models were fit using `rjags` ver. `r packageVersion("rjags")`. Code used to produce this analysis can be found in @sec-Appendix.
+
+# Discussion
+
+# References

@@ -218,7 +218,7 @@ max2 <- function(x){
 
 #Fit the model for each species and output the results
 # Loop over species (only 1 here)
-for (i in seq(1:length(occ_jags))) {
+for (i in seq(1:length(occ_data))) {
   # Subset data
   tmp <- occ_data[[i]]
   
