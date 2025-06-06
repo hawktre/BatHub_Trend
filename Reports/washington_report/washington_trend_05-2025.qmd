@@ -1,0 +1,70 @@
+---
+title: "Population Trends for Bats of the Pacific Northwest"
+title-block-banner: true
+title-block-style: none
+title-block-categories: false
+subtitle: "Occupancy Trends from Summer Acoustic Monitoring, 2016–2022"
+author:   
+  - name: Trent VanHawkins
+    affiliations:
+      - ref: osu
+    corresponding: true
+  - name: Beth Ward
+    affiliations:
+      - ref: osu
+  - name: Tom Rodhouse
+    affiliations:
+      - ref: osu
+affiliations:
+  - id: onbelay
+    name: On Belay Statistical Consulting
+  - id: osu
+    name: Oregon State University -- Cascades
+format: 
+  pdf:
+    geometry: "margin=0.75in"
+    mathspec: true
+    mainfont: "Charter"
+    cap-location: bottom
+    tbl-cap-location: bottom
+    toc: true
+    toc-title: "Contents"
+    number-sections: true
+    header-includes: 
+      - \usepackage{fancyhdr, amsthm, amssymb, amsfonts, amsmath, float, tabularx}
+      - \floatplacement{table}{H}
+      - \pagestyle{fancy}
+      - \fancyhead[R]{Population Trends Report}
+      - \fancyhead[L]{Trent VanHawkins}
+      - \fancyfoot[C]{\thepage} # Center page number at bottom of each page
+page-layout: full
+bibliography: references.bib
+---
+
+# Prepared by: On Belay Statistical Consulting  
+# Prepared for: Washington Department of Fish and Wildlife
+
+![](images/onbelay_logo.png){width=150px}
+
+\newpage
+
+# Introduction
+
+The purpose of this report is to document an occupancy trend analysis for bat species of the Pacific Northwest. Previously, the Northwestern Bat Hub for Population Monitoring and Research (NW Bat Hub) and its partners have documented evidence of a region-wide decline for Hoary Bats between 2016 and 2018 [@rodhouse2019]. Since publication of this research, the bat hub has continued population research and monitoring under North American Bat Program (NABat) summer-monitoring protocols and has since grown to include surveys in all of Oregon, Washington, and Idaho. Here, we present the preliminary results of an updated analysis including data from 2016–2022 for all of the NABat sample units encompassed by Oregon, Washington, and Idaho.
+
+# Methods
+
+Methods for the current study are similar to those published in [Rodhouse et al., 2019](https://onlinelibrary.wiley.com/doi/10.1002/ece3.5612) and @kéry2021. We provide brief detail on important components of the data and modeling procedures, but further details can be found in the literature.
+
+## The Data
+
+We queried data from NW Bat Hub database files for all data available up to the time of this report (2016–2022). The NABat summer sampling design and its explanation are well-documented in the literature [@reichert2021; @rodhouse2017; @rodhouse2019; @udell].
+
+Briefly, NABat uses a spatial grid covering the continental United States in 10×10 km sample units—here referred to as "grid cells" or simply "cells"—with an ordered sampling priority to ensure a spatially balanced sample that meets statistical modeling assumptions. The current monitoring protocol utilized by the NW Bat Hub calls for one night of acoustic monitoring at each of four spatial replicates within a cell during the summer season. Ideally, each of the spatial replicates are distributed to one of the inter-cardinal 5×5 km quadrants (NE, NW, SE, SW) of a cell, but when this is not possible, multiple detectors may be deployed in a single quadrant. The current modeling strategy is also flexible to >4 spatial replicates but does not require it. In instances where detectors were deployed for >1 night, only the first night was subsetted for analysis.
+
+The Mexican Free-tailed Bat (*Tadarida brasiliensis*) has been removed from this analysis due to small sample size and limited range.
+
+# References
+
+::: {#refs}
+:::
