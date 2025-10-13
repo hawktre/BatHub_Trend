@@ -32,8 +32,8 @@ library(sf)
 library(rjags)
 library(jagsUI)
 
-covars <- read_sf(here("DataProcessed/occurrence/batgrid_covars.shp"))
-dets <- readRDS(here("DataProcessed/detections/nw_nights.rds"))
+covars <- readRDS(here("DataProcessed/occurrence/nw_grid_shp_to2024.rds"))
+dets <- readRDS(here("DataProcessed/detections/nw_nights_to2024.rds"))
 
 possible_bats <- c("laci",
                    "lano",
@@ -53,13 +53,11 @@ possible_bats <- c("laci",
 
 ## Join Detections and Covariates
 covars_join <- covars %>% 
-  rename("cell" = CONUS_10KM,
-         "cliff_canyon" = EVT_NAME) %>% 
   select(-c(lat, long)) %>%
   select(-riverlake) %>% 
   mutate(p_forest = log(p_forest + 1),
-         cliff_canyon = log(cliff_canyon*100+1),
-         across(karst:cliff_canyon, ~scale(.x)[,1])) 
+         cliff_cover= log(cliff_cover*100+1),
+         across(karst:cliff_cover, ~scale(.x)[,1])) 
 
 ## Drop geometry to make a data frame
 covars_join <- st_drop_geometry(covars_join)

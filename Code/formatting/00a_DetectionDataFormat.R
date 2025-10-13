@@ -28,11 +28,28 @@ require(future.apply)
 require(parallel)
 
 # Read in Required Data ---------------------------------------------------
-tblDeployment <- read_csv("DataRaw/database/tblDeployment.csv")
-tblPointLocation <- read_csv("DataRaw/database/tblPointLocation.csv")
-tblSite <- read_csv("DataRaw/database/tblSite.csv")
-tluClutter <- read_csv("DataRaw/database/tluClutter.csv")
-tluWaterBodyType <- read_csv("DataRaw/database/tluWaterBodyType.csv")
+tblDeployment <- read_csv(here("DataRaw/tables/tblDeployment.csv"))
+tblPointLocation <- read_csv(here("DataRaw/tables/tblPointLocation.csv"))
+tblSite <- read_csv(here("DataRaw/tables/tblSite.csv"))
+tluClutter <- read_csv(here("DataRaw/tables/tluClutterType.csv"))
+tluWaterBodyType <- read_csv(here("DataRaw/tables/tluWaterBodyType.csv"))
+
+
+# Set the years you want to analyze  --------------------------------------
+
+first_year <- 2016
+last_year <- 2024
+
+# Fix clutter 
+unique(tblDeployment$ClutterPercent)
+
+tblDeployment <- tblDeployment |> 
+  mutate(ClutterPercent = case_when(ClutterPercent == "0% (no structural interference, e.g., open habitat)" ~ 0, 
+ClutterPercent == "1 to 25%" ~ 1,
+ClutterPercent == "26-50" ~ 2,
+ClutterPercent == "26 to 50%" ~ 2,
+ClutterPercent == "<null>" ~ NA_integer_, 
+TRUE ~ as.integer(ClutterPercent)))
 
 # Join all tables together ------------------------------------------------
 
@@ -55,7 +72,11 @@ deployment <- all_join %>% select(ID,
                     Label.y,
                     ClutterPercent) %>% 
   rename("ClutterType" = "Label.x",
-         "WaterBodyType" = "Label.y")
+         "WaterBodyType" = "Label.y") 
+
+## Create Waterbody Indicator & infer missing clutter percent
+deployment <- deployment |> mutate(water_ind = if_else(WaterBodyType != "None" | ClutterType == "Water", 1, 0),
+ClutterPercent = if_else(is.na(ClutterPercent) & ClutterType == "None", 0, ClutterPercent)) #Infer missing clutter percent from clutter type
 
 ## Fix Date Columns
 deployment$DeploymentDate <- as_datetime(deployment$DeploymentDate, format = "%m/%d/%y %T") %>% as_date()
@@ -65,10 +86,13 @@ deployment$year <- year(deployment$DeploymentDate)
 
 # Read in detection data --------------------------------------------------
 ## Read in
-acoustics <- data.table::fread(here("DataRaw/database/tblDeploymentDetection7.csv"))
+acoustics_to_2024 <- data.table::fread(here("DataRaw/tables/calls_to_2024.csv"))
+acoustics_from_2024 <- data.table::fread(here("DataRaw/tables/calls_from_2024.csv"))
+
+all_raw_acoustics <- bind_rows(acoustics_to_2024, acoustics_from_2024)
 
 ## Join with deployments and clean
-acoustics <- left_join(acoustics, deployment, by = c("DeploymentID" = "ID")) %>% 
+acoustics <- left_join(all_raw_acoustics, deployment, by = c("DeploymentID" = "ID")) %>% 
   ## Select the Columns we want to keep
   select(ID, LocationName, Night, Latitude, Longitude, ClutterType, WaterBodyType, ClutterPercent, ManualIDSpp1) %>% 
   ## Drop Blanks from Manual SPP ID
@@ -130,56 +154,51 @@ acoustics_wide <- acoustics %>%
               values_fill = 0,
               values_fn = ~if_else(is.na(.), 0, 1))
 
-##Create indicator for water and change 
-acoustics_wide <- acoustics_wide %>% 
-  mutate(water_ind = if_else(WaterBodyType == "None", 0, 1))
-
-
-
 # Get Daymet min temp (using daymetr)-----------------------------------------------------
-## create a function to get daymet data for every point
-get_daymet <- function(i, dat){
-  tmp <- download_daymet(site = dat$LocationName[i],
-                         lat = dat$Latitude[i],
-                         lon = dat$Longitude[i],
-                         start = 2016,
-                         end = 2022) 
-    daymet <- tmp %>% 
-      .$data %>% 
-    as_tibble() %>% 
-    mutate(date = as.Date(paste(year,yday, sep = "-"),"%Y-%j"),
-           site = tmp$site) %>% 
-    janitor::clean_names() %>% 
-    select(site, date, dayl_s, prcp_mm_day, tmax_deg_c, tmin_deg_c, vp_pa) 
-  
-  return(daymet)
-}
+## Write out daymet batch file
+daymet_batch <- acoustics_wide %>% select(LocationName, Latitude, Longitude) %>% rename("site" = LocationName,
+                                                                                        "latitude" = Latitude,
+                                                                                        "longitude" = Longitude) %>% 
+  distinct() |> 
+  drop_na()
 
-#format data
-daymet_get <- acoustics_wide %>% 
-  select(LocationName, Latitude, Longitude) %>% 
-  distinct() %>% 
-  arrange(LocationName)
+write.csv(daymet_batch, here("DataRaw/covariates/daymet/daymet_batch.csv"), row.names = F)
 
-#download data for all sites (commented out because it takes a long time. ONLY RUN THE FIRST TIME)
-# daymet_all <- lapply(1:nrow(daymet_get), function(x){get_daymet(i = x, dat = daymet_get)}) 
-# write_rds(daymet_all, here("DataRaw/daymet/daymet_full.rds"))
+#Download the daymet data (optional) ------------------------------
+# df_batch <- download_daymet_batch(file_location = here("DataRaw/covariates/daymet/daymet_batch.csv"), 
+#                       start = first_year, 
+#                       end = last_year, 
+#                       internal = T,
+#                     simplify = T)
 
-
-#Read in the daymet data (completed above) ------------------------------
-daymet_all <- readRDS(here("DataRaw/covariates/daymet/daymet_full.rds"))
-
+# saveRDS(df_batch, here("DataRaw/covariates/daymet/all_daymet.rds"))
+daymet_all <- readRDS(here("DataRaw/covariates/daymet/all_daymet.rds"))
 #Clean up
-daymet_all <- daymet_all %>%
-  bind_rows() %>% 
-  mutate(location_date = paste0(site,"_",as.character(date)))
+daymet_wide <- daymet_all %>%
+  filter(!str_detect(pattern = "Error", string = yday)) |> 
+  mutate(value = as.numeric(value)) |> 
+  pivot_wider(names_from = measurement, values_from = value)
+
+daymet_wide$date <- make_date(as.numeric(daymet_wide$year)) + days(as.numeric(daymet_wide$yday) - 1)
+
+daymet_wide <- daymet_wide |> 
+  select(site, date, dayl..s., prcp..mm.day., tmax..deg.c., tmin..deg.c.) |> 
+  rename("daylight" = dayl..s.,
+  "precipitation" = prcp..mm.day.,
+"tmax" = tmax..deg.c.,
+"tmin" = tmin..deg.c.)
 
 #Join with detection data
 acoustics_wide <- acoustics_wide %>% 
-  mutate(location_date = paste0(LocationName, "_", Night)) %>% 
-  left_join(.,daymet_all, by = "location_date") %>% 
-  select(-c(site,date,location_date)) #drop joined fields we don't need. 
-  
+  left_join(daymet_wide, by = c("LocationName" = "site", "Night" = "date"))
 
+test <- acoustics_wide |> filter(is.na(daylight)) |> drop_na(Latitude, Longitude)  |>  st_as_sf(coords = c("Longitude", "Latitude"), crs = "WGS84")
+
+states <- spData::us_states |> filter(NAME %in% c("Oregon", "Washington", "Idaho")) |> st_transform(crs = "WGS84")
+
+test |> 
+  ggplot()+
+  geom_sf()+
+  geom_sf(data = states, fill = "transparent")
 #Write out
-write_csv(acoustics_wide, here("DataProcessed/detections/detections_formatted_2016-2022.csv"))
+saveRDS(acoustics_wide, here("DataProcessed/detections/detections_formatted_2016-2024.rds"))

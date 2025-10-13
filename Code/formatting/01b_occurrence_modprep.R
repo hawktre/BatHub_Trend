@@ -30,7 +30,7 @@ library(sf)
 # Read in the data --------------------------------------------------------
 nw_grid_shp <- read_sf(here("DataProcessed/occurrence/batgrid_covars.shp"))
 
-nw_nights <- readRDS(here("DataProcessed/detections/nw_nights.rds"))
+nw_nights <- readRDS(here("DataProcessed/detections/nw_nights_to2024.rds"))
 
 
 ## rename nw_grid_shape to have the name cell
@@ -54,8 +54,8 @@ nw_grid_shp <- left_join(nw_grid_shp, samp_hist, by = "cell") %>%
 nw_grid_shp[is.na(nw_grid_shp)] <- 0
 
 
-# Format like wilson and save out -----------------------------------------
+# Format and save out -----------------------------------------
 nw_grid_shp <- nw_grid_shp %>% 
   arrange(desc(samp_all), cell)
   
-saveRDS(nw_grid_shp, here("DataProcessed/occurrence/nw_grid_shp.rds"))
+saveRDS(nw_grid_shp, here("DataProcessed/occurrence/nw_grid_shp_to2024.rds"))

@@ -33,11 +33,11 @@ library(kableExtra)
 
 # Read in the data --------------------------------------------------------
 
-nw_grid <- readRDS(here("DataProcessed/occurrence/nw_grid_shp.rds"))
+nw_grid <- readRDS(here("DataProcessed/occurrence/nw_grid_shp_to2024.rds"))
 
 ## Pivot Longer for Plotting and tables
 nw_grid_long <- nw_grid %>% 
-  pivot_longer(cols = samp_2016:samp_2022, names_sep = "_", 
+  pivot_longer(cols = samp_2016:samp_2024, names_sep = "_", 
                names_to = c("samp", "year"),
                values_to = "sampled") %>% 
   mutate(sampled_txt = if_else(sampled == 1, "Yes", "No"))
