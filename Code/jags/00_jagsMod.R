@@ -69,7 +69,7 @@ dets <- dets %>%
   mutate(replicate_id = as.numeric(factor(replicate, levels = unique(replicate))),
          clutter = relevel(clutter, ref = "3")) %>%
   ungroup() %>% 
-  drop_na(DEM_max, p_forest, precip, cliff_canyon) %>% 
+  drop_na(DEM_max, p_forest, precip, cliff_cover) %>%
   arrange(year, cell, replicate_id) 
 
 ## Pivot Longer to prep for array
@@ -96,7 +96,7 @@ det.covs[['water']] <- tapply(design.matrix.surveyed[,8], select(dets, cell, rep
 
 
 # Occurrence Covariates ---------------------------------------------------
-nw_grid_shp <- readRDS(here("DataProcessed/occurrence/nw_grid_shp.rds"))
+nw_grid_shp <- readRDS(here("DataProcessed/occurrence/nw_grid_shp_to2024.rds"))
 
 #divide shapefile into sampled and unsampled grid cells.
 #also arrange these by conus_id
@@ -158,9 +158,9 @@ n_visits_dfb <- pivot_wider(n_visits_dfa,
                             values_fill = list(n_visits = 0))
 
 #reorder columns
-n_visits_dfb <- select(n_visits_dfb, cell, '2016', '2017', 
+n_visits_dfb <- select(n_visits_dfb, cell, '2016', '2017',
                        '2018', '2019', '2020',
-                       '2021','2022')
+                       '2021', '2022', '2023', '2024')
 
 n_visits_jags <- n_visits_dfb %>%
   ungroup() %>%

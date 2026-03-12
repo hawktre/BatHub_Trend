@@ -33,7 +33,7 @@ require(sf)
 
 # Read in the data --------------------------------------------------------
 
-detections <- readRDS(here("DataProcessed/detections/detections_formatted_2016-2024.rds"))
+detections <-  readRDS(here("DataProcessed/detections/detections_formatted_2016-2024.rds"))
 
 # Reformat --------------------------------------------------------------------
 ## Make name of "cell" same in all datasets & Clean Names
@@ -112,8 +112,9 @@ na.rows <- detections_fn %>%
   select(-c(clutter_type, water_body_type)) %>% 
   filter(!complete.cases(.))
 
-detections_fn %>% 
-  skimr::skim()
+test <- na.rows %>% filter(!is.na(clutter_percent) & is.na(daylight))
+
+test %>% select(replicate, latitude, longitude) %>% rename("site" = replicate)
 
 ## We have 87 missing clutter percent and 4 missing daymet; so we drop those
 detections_fn <- detections_fn %>% 
@@ -125,13 +126,13 @@ detections_fn <- detections_fn %>%
          "lon" = longitude, 
          "date" = night,
          "year" = year,
-         "tmin" = tmin_deg_c,
-         "prcp" = prcp_mm_day,
-         "daylight" = dayl_s,
+         "tmin" = tmin,
+         "prcp" = precipitation,
+         "daylight" = daylight,
          "clutter" = clutter_percent,
          "water_ind" = water_ind,
          everything()) %>% 
-  select(-tmax_deg_c)
+  select(-tmax)
 
 # Reformatting occurrence data for model ----------------------------------
 ## center clutter 

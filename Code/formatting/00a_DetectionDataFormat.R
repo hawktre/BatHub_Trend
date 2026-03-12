@@ -1,6 +1,6 @@
 ## ---------------------------
 ##
-## Script name: 00_DataCuration.R
+## Script name: 00a_join_dbtables.R
 ##
 ## Purpose of script: Read-in and format data for trend analysis
 ##
@@ -19,45 +19,22 @@ options(digits = 4)
 
 ## load up the packages we will need:  (uncomment as required)
 
-require(tidyverse)
-require(here)
-require(sf)
-require(skimr)
-require(daymetr)
-require(future.apply)
-require(parallel)
+library(tidyverse)
+library(here)
+library(janitor)
 
 # Read in Required Data ---------------------------------------------------
 tblDeployment <- read_csv(here("DataRaw/tables/tblDeployment.csv"))
 tblPointLocation <- read_csv(here("DataRaw/tables/tblPointLocation.csv"))
 tblSite <- read_csv(here("DataRaw/tables/tblSite.csv"))
-tluClutter <- read_csv(here("DataRaw/tables/tluClutterType.csv"))
+tluClutter <- read_csv(here("DataRaw/tables/tluClutterType.csv")) 
 tluWaterBodyType <- read_csv(here("DataRaw/tables/tluWaterBodyType.csv"))
 
-
-# Set the years you want to analyze  --------------------------------------
-
-first_year <- 2016
-last_year <- 2024
-
-# Fix clutter 
-unique(tblDeployment$ClutterPercent)
-
-tblDeployment <- tblDeployment |> 
-  mutate(ClutterPercent = case_when(ClutterPercent == "0% (no structural interference, e.g., open habitat)" ~ 0, 
-ClutterPercent == "1 to 25%" ~ 1,
-ClutterPercent == "26-50" ~ 2,
-ClutterPercent == "26 to 50%" ~ 2,
-ClutterPercent == "<null>" ~ NA_integer_, 
-TRUE ~ as.integer(ClutterPercent)))
-
 # Join all tables together ------------------------------------------------
-
 all_join <- left_join(tblDeployment, tblPointLocation, by = join_by(PointLocationID == ID)) %>% 
   left_join(., tblSite, by = join_by(SiteID == ID)) %>% 
   left_join(., tluClutter, by = join_by(ClutterTypeID == ID)) %>% 
   left_join(., tluWaterBodyType, by = join_by(WaterBodyTypeID == ID))
-
 
 # Select only the columns we need -----------------------------------------
 
@@ -74,131 +51,54 @@ deployment <- all_join %>% select(ID,
   rename("ClutterType" = "Label.x",
          "WaterBodyType" = "Label.y") 
 
-## Create Waterbody Indicator & infer missing clutter percent
-deployment <- deployment |> mutate(water_ind = if_else(WaterBodyType != "None" | ClutterType == "Water", 1, 0),
-ClutterPercent = if_else(is.na(ClutterPercent) & ClutterType == "None", 0, ClutterPercent)) #Infer missing clutter percent from clutter type
 
-## Fix Date Columns
-deployment$DeploymentDate <- as_datetime(deployment$DeploymentDate, format = "%m/%d/%y %T") %>% as_date()
-deployment$RecoveryDate <- as_datetime(deployment$RecoveryDate, format = "%m/%d/%y %T") %>% as_date()
+
+# Make Dates ----------------------------------------
+deployment$DeploymentDate <- as_date(as_datetime(deployment$DeploymentDate, format = "%m/%d/%y %H:%M:%S"))
+deployment$RecoveryDate <- as_date(as_datetime(deployment$RecoveryDate, format = "%m/%d/%y %H:%M:%S"))
 deployment$year <- year(deployment$DeploymentDate)
 
 
-# Read in detection data --------------------------------------------------
-## Read in
-acoustics_to_2024 <- data.table::fread(here("DataRaw/tables/calls_to_2024.csv"))
-acoustics_from_2024 <- data.table::fread(here("DataRaw/tables/calls_from_2024.csv"))
+# Correct  NAs and wrong values -----------------------------
+## Clutter Percent
+unique(deployment$ClutterPercent)
 
-all_raw_acoustics <- bind_rows(acoustics_to_2024, acoustics_from_2024)
+deployment <- deployment %>% mutate(ClutterPercent = factor(case_when(ClutterPercent == "0% (no structural interference, e.g., open habitat)" ~ "0",
+                                                               ClutterPercent == "1 to 25%" ~ "1", 
+                                                               ClutterPercent == "26 to 50%" | ClutterPercent == "26-50" ~ "2",
+                                                               ClutterPercent == "<null>" ~ NA, 
+                                                               TRUE ~ ClutterPercent)))
+sum(is.na(deployment$ClutterPercent))
 
-## Join with deployments and clean
-acoustics <- left_join(all_raw_acoustics, deployment, by = c("DeploymentID" = "ID")) %>% 
-  ## Select the Columns we want to keep
-  select(ID, LocationName, Night, Latitude, Longitude, ClutterType, WaterBodyType, ClutterPercent, ManualIDSpp1) %>% 
-  ## Drop Blanks from Manual SPP ID
-  drop_na(ManualIDSpp1) %>% 
-  ## Fix values and ensure all in same case
-  mutate(ManualIDSpp1 = case_when(ManualIDSpp1 == 'LASCIN' ~ 'LACI',
-                                  ManualIDSpp1 == 'LASNOC' ~ 'LANO',
-                                  ManualIDSpp1 == 'MYOCIL' ~ 'MYCI',
-                                  ManualIDSpp1 == 'MYOEVO' ~ 'MYEV',
-                                  ManualIDSpp1 == 'MYOLUC' ~ 'MYLU',
-                                  ManualIDSpp1 == 'MYOYUM' ~ 'MYYU',
-                                  ManualIDSpp1 == 'MYOCAL' ~ 'MYCA',
-                                  ManualIDSpp1 == 'EPTFUS' ~ 'EPFU',
-                                  ManualIDSpp1 == 'MYOTHY' ~ 'MYTH',
-                                  TRUE ~ ManualIDSpp1),
-         ManualIDSpp1 = tolower(ManualIDSpp1),
-         Night = mdy_hms(Night),
-         Year = year(Night))
+## Clutter Type
+unique(deployment$ClutterType)
+deployment <- deployment %>% mutate(ClutterType = if_else(ClutterType == "<null>", NA, ClutterType))
 
-## Create a list of possible bat IDs
-possible_bats <- c("laci",
-                   "lano",
-                   "myev",
-                   "epfu",
-                   "myyu",
-                   "myth",
-                   "myci",
-                   "myvo",
-                   "tabr",
-                   "anpa",
-                   "pahe",
-                   "euma",
-                   "myca",
-                   "mylu",
-                   "coto")
+## Water Bodies
+unique(deployment$WaterBodyType)
+### Create Water Indicator
+deployment <- deployment %>% mutate(water_ind = if_else(WaterBodyType == "None", 0, 1))
+### Correct Water Indicator NA's 
+deployment <- deployment %>% mutate(water_ind = if_else(is.na(water_ind) & str_detect(ClutterType, "Water"), 1, water_ind))
 
 
-# Remove WA TABR ----------------------------------------------------------
+# How many rows are we dropping?  -----------------------------------------
+## Write CSV for missing locations
+missing_sites <- deployment %>% filter(is.na(ClutterPercent) | is.na(water_ind))
+write.csv(missing_sites, here("DataProcessed/detections/sites_missing_covars.csv"))
 
-##find the record
-bad_tabr <-acoustics %>% filter(ManualIDSpp1 == "tabr") %>% dplyr::slice_max(Latitude) %>% .$ID
+## How many sites? 
+n_drop <- sum(is.na(deployment$ClutterPercent) | is.na(deployment$water_ind))
+p_drop <- n_drop/nrow(deployment)
 
-##remove bad record
-acoustics <- acoustics %>% filter(ID != bad_tabr)
+cat("Dropping", n_drop, "rows missing clutter percent or waterbody indicator")
 
+## Drop the missing rows
+deployment <- deployment %>% drop_na(ClutterPercent, water_ind) %>% 
+  select(-c(ClutterType, WaterBodyType))
 
-# Remove non-bats ---------------------------------------------------------
-acoustics <- acoustics %>% filter(ManualIDSpp1 %in% possible_bats)
+deployment <- clean_names(deployment)
 
+# Save out for verification in excel --------------------------------------
+saveRDS(deployment, here("DataProcessed/detections/detections_to2024.rds"))
 
-# Pivot Wider to get Spp Richness -------------------------------------------------------------
-## Pivot Wider
-acoustics_wide <- acoustics %>%
-  select(-ID) %>% 
-  distinct() %>% 
-  pivot_wider(names_from = ManualIDSpp1, values_from = ManualIDSpp1, 
-              id_cols = c("LocationName", "Night", "Latitude", "Longitude",
-                          "ClutterType", "WaterBodyType", "ClutterPercent", "Year"),
-              values_fill = 0,
-              values_fn = ~if_else(is.na(.), 0, 1))
-
-# Get Daymet min temp (using daymetr)-----------------------------------------------------
-## Write out daymet batch file
-daymet_batch <- acoustics_wide %>% select(LocationName, Latitude, Longitude) %>% rename("site" = LocationName,
-                                                                                        "latitude" = Latitude,
-                                                                                        "longitude" = Longitude) %>% 
-  distinct() |> 
-  drop_na()
-
-write.csv(daymet_batch, here("DataRaw/covariates/daymet/daymet_batch.csv"), row.names = F)
-
-#Download the daymet data (optional) ------------------------------
-# df_batch <- download_daymet_batch(file_location = here("DataRaw/covariates/daymet/daymet_batch.csv"), 
-#                       start = first_year, 
-#                       end = last_year, 
-#                       internal = T,
-#                     simplify = T)
-
-# saveRDS(df_batch, here("DataRaw/covariates/daymet/all_daymet.rds"))
-daymet_all <- readRDS(here("DataRaw/covariates/daymet/all_daymet.rds"))
-#Clean up
-daymet_wide <- daymet_all %>%
-  filter(!str_detect(pattern = "Error", string = yday)) |> 
-  mutate(value = as.numeric(value)) |> 
-  pivot_wider(names_from = measurement, values_from = value)
-
-daymet_wide$date <- make_date(as.numeric(daymet_wide$year)) + days(as.numeric(daymet_wide$yday) - 1)
-
-daymet_wide <- daymet_wide |> 
-  select(site, date, dayl..s., prcp..mm.day., tmax..deg.c., tmin..deg.c.) |> 
-  rename("daylight" = dayl..s.,
-  "precipitation" = prcp..mm.day.,
-"tmax" = tmax..deg.c.,
-"tmin" = tmin..deg.c.)
-
-#Join with detection data
-acoustics_wide <- acoustics_wide %>% 
-  left_join(daymet_wide, by = c("LocationName" = "site", "Night" = "date"))
-
-test <- acoustics_wide |> filter(is.na(daylight)) |> drop_na(Latitude, Longitude)  |>  st_as_sf(coords = c("Longitude", "Latitude"), crs = "WGS84")
-
-states <- spData::us_states |> filter(NAME %in% c("Oregon", "Washington", "Idaho")) |> st_transform(crs = "WGS84")
-
-test |> 
-  ggplot()+
-  geom_sf()+
-  geom_sf(data = states, fill = "transparent")
-#Write out
-saveRDS(acoustics_wide, here("DataProcessed/detections/detections_formatted_2016-2024.rds"))

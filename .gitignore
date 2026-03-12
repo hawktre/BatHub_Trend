@@ -43,6 +43,13 @@ vignettes/*.pdf
 DataRaw/*
 DataProcessed/*
 !*/ReadMe.md
+!*/README.md
+
+# Python virtual environment
+venv/
+
+# Claude Code memory directory
+.claude/
 DataRaw.nosync/*
 DataProcessed.nosync/*
 .ProjData/*
