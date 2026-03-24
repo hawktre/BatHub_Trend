@@ -22,6 +22,8 @@ options(digits = 4)
 library(tidyverse)
 library(here)
 library(janitor)
+library(sf)
+library(tigris)
 
 # Read in Required Data ---------------------------------------------------
 tblDeployment <- read_csv(here("DataRaw/tables/tblDeployment.csv"))
@@ -58,6 +60,19 @@ deployment$DeploymentDate <- as_date(as_datetime(deployment$DeploymentDate, form
 deployment$RecoveryDate <- as_date(as_datetime(deployment$RecoveryDate, format = "%m/%d/%y %H:%M:%S"))
 deployment$year <- year(deployment$DeploymentDate)
 
+# Create State column -----------------------------------------------------
+all_states <- states(cb = TRUE)
+states_map <- all_states %>% 
+  filter(NAME %in% c("Oregon", "Washington", "Idaho"))
+
+deployment <- deployment %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>%
+  st_join(states_map %>% select(NAME) %>% st_transform(4326)) %>%
+  filter(!is.na(NAME)) %>%
+  rename(state = NAME) %>%
+  mutate(Longitude = st_coordinates(.)[, 1],
+         Latitude = st_coordinates(.)[, 2]) %>%
+  st_drop_geometry()
 
 # Correct  NAs and wrong values -----------------------------
 ## Clutter Percent
@@ -81,11 +96,30 @@ deployment <- deployment %>% mutate(water_ind = if_else(WaterBodyType == "None",
 ### Correct Water Indicator NA's 
 deployment <- deployment %>% mutate(water_ind = if_else(is.na(water_ind) & str_detect(ClutterType, "Water"), 1, water_ind))
 
-
 # How many rows are we dropping?  -----------------------------------------
 ## Write CSV for missing locations
 missing_sites <- deployment %>% filter(is.na(ClutterPercent) | is.na(water_ind))
 write.csv(missing_sites, here("DataProcessed/detections/sites_missing_covars.csv"))
+
+## Create plot of missing sites
+states_map <- states(cb = TRUE) %>% 
+  filter(NAME %in% c("Oregon", "Washington", "Idaho"))
+
+missing_sites %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>% 
+  ggplot() +
+  geom_sf(data = states_map, fill = "gray90", color = "black") +
+  geom_sf(aes(color = factor(year)))
+
+ggsave(filename = "missing_clutterpercent.png", path = here("DataProcessed/detections/"), height = 6, width = 6, units = "in")
+
+## Impute with most recent value
+deployment <- deployment %>%
+  arrange(LocationName, year) %>%
+  group_by(LocationName) %>%
+  mutate(ClutterPercent_imputed = is.na(ClutterPercent)) %>%
+  fill(ClutterPercent, .direction = "down") %>%
+  ungroup()
 
 ## How many sites? 
 n_drop <- sum(is.na(deployment$ClutterPercent) | is.na(deployment$water_ind))
@@ -97,8 +131,28 @@ cat("Dropping", n_drop, "rows missing clutter percent or waterbody indicator")
 deployment <- deployment %>% drop_na(ClutterPercent, water_ind) %>% 
   select(-c(ClutterType, WaterBodyType))
 
-deployment <- clean_names(deployment)
+deployment <- clean_names(deployment) %>%
+  arrange(sample_unit_id, deployment_date)
 
+deployment %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>% 
+  ggplot() +
+  geom_sf(data = states_map, fill = "gray90", color = "black") +
+  geom_sf(aes(color = state))+
+  facet_wrap(~year)+
+  theme_minimal() +
+  theme(legend.position = "bottom")+
+  labs(color = "State")
+  
 # Save out for verification in excel --------------------------------------
-saveRDS(deployment, here("DataProcessed/detections/detections_to2024.rds"))
+saveRDS(deployment, here("DataProcessed/detections/deployments_to2024.rds"))
+
+
+# Save out sites for daymet -----------------------------------------------
+daymet_sites <- deployment %>% 
+  select(location_name, deployment_date, latitude, longitude) %>% 
+  distinct()
+
+## Save out for daymet 
+write_csv(daymet_sites, here("DataRaw/covariates/daymet/daymet_sites.csv"))
 
