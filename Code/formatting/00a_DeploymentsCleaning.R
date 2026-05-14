@@ -113,14 +113,6 @@ missing_sites %>%
 
 ggsave(filename = "missing_clutterpercent.png", path = here("DataProcessed/detections/"), height = 6, width = 6, units = "in")
 
-## Impute with most recent value
-deployment <- deployment %>%
-  arrange(LocationName, year) %>%
-  group_by(LocationName) %>%
-  mutate(ClutterPercent_imputed = is.na(ClutterPercent)) %>%
-  fill(ClutterPercent, .direction = "down") %>%
-  ungroup()
-
 ## How many sites? 
 n_drop <- sum(is.na(deployment$ClutterPercent) | is.na(deployment$water_ind))
 p_drop <- n_drop/nrow(deployment)

@@ -1,6 +1,6 @@
 ## ---------------------------
 ##
-## Script name: 02_TrendFigs.R
+## Script name: 01a_SummaryFormat.R
 ##
 ## Purpose of script: Creating Figures and plots for trend summaries
 ##

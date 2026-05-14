@@ -1,85 +1,51 @@
 model {
   # Priors
-  ## Dynamics Parameters - these govern the occupancy dynamics between years
+  ## Dynamics Parameters
   for (t in 1:(n_years-1)){
-    phi[t] ~ dnorm(phi_prior_mean, phi_prior_prec)        # survival: prob of staying occupied year t to t+1
-    gamma[t] ~ dnorm(gamma_prior_mean, gamma_prior_prec)  # colonization: prob of becoming occupied year t to t+1
+    phi[t]   ~ dnorm(0, 0.1)    # survival
+    gamma[t] ~ dnorm(0, 0.1)    # colonization
   }
 
   ## Occurrence-level Parameters
-  alpha01 ~ dnorm(alpha_prior_mean, alpha_prior_prec)     # intercept for year 1 occupancy probability
-  
-  for(n in 1:n_xcovs){
-    alphas[n] ~ dnorm(alpha_prior_mean, alpha_prior_prec) # coefficients for occupancy covariates in xmat
+  alpha01 ~ dnorm(0, 0.1)       # year 1 occupancy intercept
+  for (n in 1:n_xcovs){
+    alphas[n] ~ dnorm(0, 0.1)   # occupancy covariate coefficients
   }
 
   ## Detection-level Parameters
-  for(n in 1:n_pcovs){
-    betas[n] ~ dnorm(beta_prior_mean, beta_prior_prec)    # coefficients for detection covariates in pmat
+  for (n in 1:n_pcovs){
+    betas[n] ~ dnorm(0, 0.1)    # detection covariate coefficients (intercept + covariates)
   }
 
   # Occurrence submodel
-  for(i in 1:n_sites){
+  ## Year 1: occupancy from intercept + covariates
+  logit_psi[1:n_sites, 1] <- alpha01 + xmat %*% alphas
 
-    # --- Year 1 ---
-    # Linear predictor for occupancy in year 1: intercept + occupancy covariates
-    logit_psi[i, 1] <- alpha01 + inprod(xmat[i,], alphas)
-    
-    # Transform from logit scale to probability scale
+  ## Years 2+: gamma as colonization intercept + covariates + survival term added later
+  for (t in 1:(n_years-1)){
+    logit_psi[1:n_sites, t+1] <- gamma[t] + xmat %*% alphas
+  }
+
+  # Ecological and observation submodel
+  for (i in 1:n_sites){
+
+    # Year 1
     psi[i, 1] <- ilogit(logit_psi[i, 1])
-    
-    # Draw latent occupancy state from Bernoulli with prob psi
-    # z[i,1] = 1 if site i is occupied in year 1, 0 otherwise
-    z[i, 1] ~ dbern(psi[i, 1])
+    z[i, 1]   ~ dbern(psi[i, 1])
 
-    # Detection model for year 1
-    for(j in 1:n_visits[i, 1]){
-      # Linear predictor for detection: dot product of detection covariates and coefficients
-      logit_p[i, j, 1] <- inprod(pmat[i, j, 1,], betas)
-      
-      # Transform detection probability from logit to probability scale
-      p[i, j, 1] <- ilogit(logit_p[i, j, 1])
-      
-      # Observed detections ~ Bernoulli(z * p): if site unoccupied (z=0), detection prob is 0
-      dets[i, j, 1] ~ dbern(z[i, 1] * p[i, j, 1])
+    for (j in 1:n_visits[i, 1]){
+      dets[i, j, 1] ~ dbern(z[i, 1] * ilogit(inprod(pmat[i, j, 1, ], betas)))
     }
 
-    # --- Years 2 to n_years ---
-    for(t in 2:n_years){
-      # Linear predictor for occupancy in year t:
-      # gamma[t-1] is the colonization intercept for this transition
-      # inprod(xmat[i,], alphas) is the contribution of occupancy covariates
-      # phi[t-1] * z[i, t-1] adds the survival effect if site was occupied in previous year
-      logit_psi[i, t] <- gamma[t-1] + inprod(xmat[i,], alphas) + phi[t-1] * z[i, t-1]
-      
-      # Transform occupancy probability from logit to probability scale
-      psi[i, t] <- ilogit(logit_psi[i, t])
-      
-      # Draw latent occupancy state: site is occupied if it survived or was colonized
-      z[i, t] ~ dbern(psi[i, t])
+    # Years 2 to n_years
+    for (t in 2:n_years){
+      # Survival term phi[t-1] * z[i,t-1] added to logit_psi on logit scale
+      psi[i, t] <- ilogit(logit_psi[i, t] + z[i, t-1] * phi[t-1])
+      z[i, t]   ~ dbern(psi[i, t])
 
-      # Detection model for year t
-      for(j in 1:n_visits[i, t]){
-        # Linear predictor for detection probability at site i, visit j, year t
-        logit_p[i, j, t] <- inprod(pmat[i, j, t,], betas)
-        
-        # Transform detection probability from logit to probability scale
-        p[i, j, t] <- ilogit(logit_p[i, j, t])
-        
-        # Observed detections ~ Bernoulli(z * p): detection only possible if site is occupied
-        dets[i, j, t] ~ dbern(z[i, t] * p[i, j, t])
+      for (j in 1:n_visits[i, t]){
+        dets[i, j, t] ~ dbern(z[i, t] * ilogit(inprod(pmat[i, j, t, ], betas)))
       }
     }
-  }
-  
-  # Derived quantities
-  ## Mean detection probability per year averaged across sites and visits
-  for(t in 1:n_years){
-    mean_p[t] <- mean(p[1:n_sites, 1:n_visits_max, t])
-  }
-  
-  ## Mean occupancy probability per year averaged across sites
-  for(t in 1:n_years){
-    mean_psi[t] <- mean(psi[1:n_sites, t])
   }
 }

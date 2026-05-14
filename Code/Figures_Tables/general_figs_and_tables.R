@@ -33,18 +33,18 @@ library(kableExtra)
 
 # Read in the data --------------------------------------------------------
 
-nw_grid <- readRDS(here("DataProcessed/occurrence/nw_grid_shp_to2024.rds"))
+nw_grid <- readRDS(here("DataProcessed/occurrence/nw_grid.rds"))
 
 ## Pivot Longer for Plotting and tables
 nw_grid_long <- nw_grid %>% 
-  pivot_longer(cols = samp_2016:samp_2024, names_sep = "_", 
+  pivot_longer(cols = sampled_2016:sampled_2024, names_sep = "_", 
                names_to = c("samp", "year"),
                values_to = "sampled") %>% 
   mutate(sampled_txt = if_else(sampled == 1, "Yes", "No"))
 
 ## Create a table
 nw_grid_long %>% 
-  group_by(year) %>% 
+  group_by(state, year) %>% 
   reframe(sites = sum(sampled)) %>% 
   kableExtra::kable(col.names = c("Year", "Sites Sampled")) %>% 
   kable_styling()
